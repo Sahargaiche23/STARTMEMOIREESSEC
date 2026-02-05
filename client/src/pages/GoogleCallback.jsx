@@ -1,7 +1,6 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
-import * as faceapi from 'face-api.js';
 import toast from 'react-hot-toast';
 import api from '../utils/api';
 import useAuthStore from '../store/authStore';
@@ -10,55 +9,22 @@ const GoogleCallback = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { setAuth } = useAuthStore();
+  const processedRef = useRef(false);
 
   useEffect(() => {
+    // Prevent double processing (React StrictMode calls useEffect twice)
+    if (processedRef.current) return;
+    
     const code = searchParams.get('code');
     
     if (code) {
+      processedRef.current = true;
       handleGoogleCallback(code);
     } else {
       toast.error('Erreur de connexion Google');
       navigate('/login');
     }
   }, [searchParams]);
-
-  const extractFaceFromImage = async (imageUrl) => {
-    try {
-      // Load face-api models
-      await Promise.all([
-        faceapi.nets.tinyFaceDetector.loadFromUri('/models'),
-        faceapi.nets.faceLandmark68Net.loadFromUri('/models'),
-        faceapi.nets.faceRecognitionNet.loadFromUri('/models')
-      ]);
-
-      // Create image element and load the avatar
-      const img = new Image();
-      img.crossOrigin = 'anonymous';
-      
-      return new Promise((resolve) => {
-        img.onload = async () => {
-          try {
-            const detections = await faceapi
-              .detectSingleFace(img, new faceapi.TinyFaceDetectorOptions())
-              .withFaceLandmarks()
-              .withFaceDescriptor();
-
-            if (detections) {
-              resolve(Array.from(detections.descriptor));
-            } else {
-              resolve(null);
-            }
-          } catch {
-            resolve(null);
-          }
-        };
-        img.onerror = () => resolve(null);
-        img.src = imageUrl;
-      });
-    } catch {
-      return null;
-    }
-  };
 
   const handleGoogleCallback = async (code) => {
     try {
@@ -69,23 +35,7 @@ const GoogleCallback = () => {
       
       setAuth(response.data.token, response.data.user);
       
-      // Try to auto-register face from Google avatar
-      const avatarUrl = response.data.user?.avatarUrl;
-      if (avatarUrl) {
-        const faceDescriptor = await extractFaceFromImage(avatarUrl);
-        if (faceDescriptor) {
-          try {
-            await api.post('/auth/face/register', { faceDescriptor });
-            toast.success('Connexion Google réussie ! Reconnaissance faciale configurée automatiquement.');
-          } catch {
-            toast.success('Connexion Google réussie !');
-          }
-        } else {
-          toast.success('Connexion Google réussie !');
-        }
-      } else {
-        toast.success('Connexion Google réussie !');
-      }
+      toast.success('Connexion Google réussie !');
       
       navigate('/dashboard');
     } catch (error) {

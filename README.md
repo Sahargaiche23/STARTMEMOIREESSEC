@@ -37,9 +37,7 @@ Application web de création de startups pour accompagner les jeunes entrepreneu
 
 ### Étapes
 
-1. **Cloner le projet**
-```bash
-cd /home/sahar/Bureau/memoire/CascadeProjects/windsurf-project
+
 ```
 
 2. **Installer les dépendances**
