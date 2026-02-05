@@ -116,10 +116,15 @@ router.get('/subscription', authMiddleware, (req, res) => {
     `).get(req.user.userId);
 
     const plan = subscriptionPlans[subscription?.plan || 'free'];
+    
+    // Check if subscription is actually active (payment approved)
+    const isActive = subscription?.isActive === 1 && subscription?.paymentStatus === 'approved';
 
     res.json({ 
-      subscription: subscription || { plan: 'free', isActive: true },
-      planDetails: plan
+      subscription: subscription || { plan: 'free', isActive: true, paymentStatus: 'approved' },
+      planDetails: plan,
+      canAccessFeatures: subscription?.plan === 'free' || isActive,
+      paymentStatus: subscription?.paymentStatus || 'approved'
     });
   } catch (error) {
     console.error('Get subscription error:', error);
@@ -211,7 +216,7 @@ router.post('/initiate', authMiddleware, (req, res) => {
   }
 });
 
-// Confirm payment (webhook simulation for demo)
+// Confirm payment (user confirms they made the payment - awaiting admin approval)
 router.post('/confirm/:transactionId', authMiddleware, (req, res) => {
   try {
     const payment = db.prepare('SELECT * FROM payments WHERE transactionId = ? AND userId = ?')
@@ -221,34 +226,31 @@ router.post('/confirm/:transactionId', authMiddleware, (req, res) => {
       return res.status(404).json({ message: 'Paiement non trouvé' });
     }
 
-    if (payment.status === 'completed') {
-      return res.status(400).json({ message: 'Paiement déjà confirmé' });
+    if (payment.status !== 'pending') {
+      return res.status(400).json({ message: 'Ce paiement a déjà été traité' });
     }
 
-    // Update payment status
-    db.prepare('UPDATE payments SET status = ? WHERE id = ?')
-      .run('completed', payment.id);
-
-    // Update subscription
-    const endDate = new Date();
-    endDate.setMonth(endDate.getMonth() + 1);
-
-    db.prepare(`
-      UPDATE subscriptions SET 
-        plan = ?, 
-        startDate = CURRENT_TIMESTAMP,
-        endDate = ?,
-        isActive = 1
-      WHERE userId = ?
-    `).run(payment.subscriptionType, endDate.toISOString(), req.user.userId);
-
-    // Update user subscription field
-    db.prepare('UPDATE users SET subscription = ? WHERE id = ?')
-      .run(payment.subscriptionType, req.user.userId);
+    // Create/update subscription with pending payment status (NOT active yet)
+    const existingSub = db.prepare('SELECT * FROM subscriptions WHERE userId = ?').get(req.user.userId);
+    
+    if (existingSub) {
+      db.prepare(`
+        UPDATE subscriptions SET 
+          plan = ?, 
+          paymentStatus = 'pending',
+          isActive = 0
+        WHERE userId = ?
+      `).run(payment.subscriptionType, req.user.userId);
+    } else {
+      db.prepare(`
+        INSERT INTO subscriptions (userId, plan, isActive, paymentStatus)
+        VALUES (?, ?, 0, 'pending')
+      `).run(req.user.userId, payment.subscriptionType);
+    }
 
     res.json({ 
-      message: 'Paiement confirmé avec succès',
-      subscription: payment.subscriptionType
+      message: 'Paiement enregistré. En attente de validation par l\'administrateur.',
+      status: 'pending_approval'
     });
   } catch (error) {
     console.error('Confirm payment error:', error);

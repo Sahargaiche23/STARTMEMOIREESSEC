@@ -12,10 +12,14 @@ const ADMIN_PASSWORD = 'Admin@2024!';
 // Admin login
 router.post('/login', async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const email = req.body.email?.trim();
+    const password = req.body.password?.trim();
+    
+    console.log('Admin login attempt:', { email, password, expectedEmail: ADMIN_EMAIL, expectedPassword: ADMIN_PASSWORD });
     
     // Check admin credentials
     if (email !== ADMIN_EMAIL || password !== ADMIN_PASSWORD) {
+      console.log('Admin login failed - credentials mismatch');
       return res.status(401).json({ message: 'Identifiants administrateur incorrects' });
     }
     
@@ -61,7 +65,7 @@ router.get('/stats', authMiddleware, isAdmin, (req, res) => {
     const totalUsers = db.prepare('SELECT COUNT(*) as count FROM users').get().count;
     const totalProjects = db.prepare('SELECT COUNT(*) as count FROM projects').get().count;
     const totalIdeas = db.prepare('SELECT COUNT(*) as count FROM ideas').get().count;
-    const activeSubscriptions = db.prepare('SELECT COUNT(*) as count FROM subscriptions WHERE isActive = 1 AND plan != "free"').get().count;
+    const activeSubscriptions = db.prepare("SELECT COUNT(*) as count FROM subscriptions WHERE isActive = 1 AND plan != 'free'").get().count;
     
     // Users by subscription
     const usersByPlan = db.prepare(`
@@ -296,6 +300,64 @@ router.get('/payments', authMiddleware, isAdmin, (req, res) => {
     });
   } catch (error) {
     console.error('Get payments error:', error);
+    res.status(500).json({ message: 'Erreur serveur' });
+  }
+});
+
+// Approve/Reject payment
+router.put('/payments/:id/status', authMiddleware, isAdmin, (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body; // 'approved' or 'rejected'
+    
+    if (!['approved', 'rejected', 'pending'].includes(status)) {
+      return res.status(400).json({ message: 'Statut invalide' });
+    }
+    
+    const payment = db.prepare('SELECT * FROM payments WHERE id = ?').get(id);
+    if (!payment) {
+      return res.status(404).json({ message: 'Paiement non trouvé' });
+    }
+    
+    // Update payment status
+    db.prepare('UPDATE payments SET status = ? WHERE id = ?').run(status, id);
+    
+    // If approved, activate the subscription
+    if (status === 'approved') {
+      const subscription = db.prepare('SELECT * FROM subscriptions WHERE userId = ?').get(payment.userId);
+      if (subscription) {
+        db.prepare('UPDATE subscriptions SET isActive = 1, paymentStatus = ? WHERE userId = ?').run('approved', payment.userId);
+      } else {
+        // Create subscription if doesn't exist
+        db.prepare(`
+          INSERT INTO subscriptions (userId, plan, isActive, paymentStatus, startDate)
+          VALUES (?, ?, 1, 'approved', datetime('now'))
+        `).run(payment.userId, payment.subscriptionType || 'pro');
+      }
+      
+      // Update user subscription field
+      db.prepare('UPDATE users SET subscription = ? WHERE id = ?').run(payment.subscriptionType || 'pro', payment.userId);
+      
+      // Create notification for user
+      db.prepare(`
+        INSERT INTO notifications (userId, type, title, message)
+        VALUES (?, 'subscription_approved', 'Abonnement activé', 'Votre paiement a été approuvé. Votre abonnement ${payment.subscriptionType} est maintenant actif !')
+      `).run(payment.userId);
+      
+    } else if (status === 'rejected') {
+      // Deactivate subscription if rejected
+      db.prepare('UPDATE subscriptions SET isActive = 0, paymentStatus = ? WHERE userId = ?').run('rejected', payment.userId);
+      
+      // Create notification for user
+      db.prepare(`
+        INSERT INTO notifications (userId, type, title, message)
+        VALUES (?, 'subscription_rejected', 'Paiement rejeté', 'Votre paiement a été rejeté. Veuillez contacter le support pour plus d''informations.')
+      `).run(payment.userId);
+    }
+    
+    res.json({ message: `Paiement ${status === 'approved' ? 'approuvé' : 'rejeté'}` });
+  } catch (error) {
+    console.error('Update payment status error:', error);
     res.status(500).json({ message: 'Erreur serveur' });
   }
 });

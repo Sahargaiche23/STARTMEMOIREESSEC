@@ -1,13 +1,19 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Shield, Mail, Lock, Eye, EyeOff, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import api from '../../utils/api';
-import useAuthStore from '../../store/authStore';
+import axios from 'axios';
 
 const AdminLogin = () => {
   const navigate = useNavigate();
-  const { setAuth } = useAuthStore();
+
+  useEffect(() => {
+    // Check if already logged in as admin
+    const token = sessionStorage.getItem('admin-token');
+    if (token) {
+      window.location.href = '/admin';
+    }
+  }, []);
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
@@ -20,10 +26,16 @@ const AdminLogin = () => {
     setLoading(true);
 
     try {
-      const response = await api.post('/admin/login', formData);
-      setAuth(response.data.token, response.data.user);
+      console.log('Sending admin login:', formData);
+      const response = await axios.post('/api/admin/login', formData, {
+        headers: { 'Content-Type': 'application/json' }
+      });
+      console.log('Admin login response:', response.data);
+      // Store admin token separately
+      sessionStorage.setItem('admin-token', response.data.token);
+      sessionStorage.setItem('admin-user', JSON.stringify(response.data.user));
       toast.success('Connexion admin réussie');
-      navigate('/admin');
+      window.location.href = '/admin';
     } catch (error) {
       toast.error(error.response?.data?.message || 'Identifiants incorrects');
     } finally {

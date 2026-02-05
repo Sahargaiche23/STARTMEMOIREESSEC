@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { 
   CreditCard, Search, Filter, ChevronLeft, ChevronRight,
-  DollarSign, TrendingUp, CheckCircle, Clock, XCircle
+  DollarSign, TrendingUp, CheckCircle, Clock, XCircle, Check, X
 } from 'lucide-react';
-import api from '../../utils/api';
+import adminApi from '../../utils/adminApi';
 import toast from 'react-hot-toast';
 
 const AdminPayments = () => {
@@ -25,7 +25,7 @@ const AdminPayments = () => {
         limit: 20,
         status: statusFilter
       });
-      const res = await api.get(`/admin/payments?${params}`);
+      const res = await adminApi.get(`/admin/payments?${params}`);
       setPayments(res.data.payments);
       setPagination(res.data.pagination);
       
@@ -54,10 +54,33 @@ const AdminPayments = () => {
 
   const getStatusClass = (status) => {
     switch (status) {
-      case 'completed': return 'bg-green-100 text-green-700';
+      case 'completed': 
+      case 'approved': return 'bg-green-100 text-green-700';
       case 'pending': return 'bg-yellow-100 text-yellow-700';
-      case 'failed': return 'bg-red-100 text-red-700';
+      case 'failed': 
+      case 'rejected': return 'bg-red-100 text-red-700';
       default: return 'bg-gray-100 text-gray-700';
+    }
+  };
+
+  const handleApprove = async (paymentId) => {
+    try {
+      await adminApi.put(`/admin/payments/${paymentId}/status`, { status: 'approved' });
+      toast.success('Paiement approuvé - Abonnement activé');
+      fetchPayments();
+    } catch (error) {
+      toast.error('Erreur lors de l\'approbation');
+    }
+  };
+
+  const handleReject = async (paymentId) => {
+    if (!confirm('Êtes-vous sûr de vouloir rejeter ce paiement ?')) return;
+    try {
+      await adminApi.put(`/admin/payments/${paymentId}/status`, { status: 'rejected' });
+      toast.success('Paiement rejeté');
+      fetchPayments();
+    } catch (error) {
+      toast.error('Erreur lors du rejet');
     }
   };
 
@@ -137,18 +160,19 @@ const AdminPayments = () => {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Statut</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-8 text-center">
+                  <td colSpan={8} className="px-6 py-8 text-center">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-500 mx-auto"></div>
                   </td>
                 </tr>
               ) : payments.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-8 text-center text-gray-500">
+                  <td colSpan={8} className="px-6 py-8 text-center text-gray-500">
                     Aucun paiement trouvé
                   </td>
                 </tr>
@@ -182,6 +206,28 @@ const AdminPayments = () => {
                         hour: '2-digit',
                         minute: '2-digit'
                       })}
+                    </td>
+                    <td className="px-6 py-4">
+                      {payment.status === 'pending' ? (
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => handleApprove(payment.id)}
+                            className="p-2 bg-green-100 text-green-600 rounded-lg hover:bg-green-200 transition-colors"
+                            title="Approuver"
+                          >
+                            <Check className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleReject(payment.id)}
+                            className="p-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-colors"
+                            title="Rejeter"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ) : (
+                        <span className="text-gray-400 text-sm">-</span>
+                      )}
                     </td>
                   </tr>
                 ))

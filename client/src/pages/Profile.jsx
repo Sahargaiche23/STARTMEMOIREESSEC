@@ -627,6 +627,27 @@ const Profile = () => {
             <div className="space-y-6">
               <div className="card">
                 <h2 className="text-lg font-semibold text-gray-900 mb-4">Mon abonnement</h2>
+                
+                {/* Payment Status Banner */}
+                {subscription?.paymentStatus === 'pending' && (
+                  <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    <p className="text-yellow-800 font-medium">⏳ Paiement en attente de validation</p>
+                    <p className="text-sm text-yellow-600">Votre paiement est en cours de vérification par l'administrateur. Vous serez notifié une fois approuvé.</p>
+                  </div>
+                )}
+                {subscription?.paymentStatus === 'rejected' && (
+                  <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+                    <p className="text-red-800 font-medium">❌ Paiement rejeté</p>
+                    <p className="text-sm text-red-600">Votre paiement a été rejeté. Veuillez contacter le support ou réessayer.</p>
+                  </div>
+                )}
+                {subscription?.paymentStatus === 'approved' && subscription?.subscription?.plan !== 'free' && (
+                  <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+                    <p className="text-green-800 font-medium">✅ Abonnement actif</p>
+                    <p className="text-sm text-green-600">Votre abonnement est actif et toutes les fonctionnalités sont disponibles.</p>
+                  </div>
+                )}
+
                 {subscription && (
                   <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
                     <div>
@@ -640,7 +661,7 @@ const Profile = () => {
                         }
                       </p>
                     </div>
-                    {subscription.subscription?.plan !== 'free' && (
+                    {subscription.subscription?.plan !== 'free' && subscription.canAccessFeatures && (
                       <button onClick={cancelSubscription} className="text-red-600 hover:underline text-sm">
                         Annuler l'abonnement
                       </button>

@@ -23,6 +23,7 @@ import AdminLogin from './pages/admin/AdminLogin';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import AdminUsers from './pages/admin/AdminUsers';
 import AdminPayments from './pages/admin/AdminPayments';
+import AdminProjects from './pages/admin/AdminProjects';
 
 const ProtectedRoute = ({ children }) => {
   const { isAuthenticated } = useAuthStore();
@@ -45,9 +46,12 @@ const PublicRoute = ({ children }) => {
 };
 
 const AdminRoute = ({ children }) => {
-  const { isAuthenticated, user } = useAuthStore();
+  const { isAuthenticated, user, token } = useAuthStore();
   
-  if (!isAuthenticated || user?.role !== 'admin') {
+  // Check if user is admin (either by role or by checking token)
+  const isAdmin = user?.role === 'admin' || (token && user?.email === 'admin@startuplab.com');
+  
+  if (!isAuthenticated || !isAdmin) {
     return <Navigate to="/admin/login" replace />;
   }
   
@@ -166,32 +170,24 @@ function App() {
         {/* Admin Routes */}
         <Route path="/admin/login" element={<AdminLogin />} />
         <Route path="/admin" element={
-          <AdminRoute>
-            <AdminLayout>
-              <AdminDashboard />
-            </AdminLayout>
-          </AdminRoute>
+          <AdminLayout>
+            <AdminDashboard />
+          </AdminLayout>
         } />
         <Route path="/admin/users" element={
-          <AdminRoute>
-            <AdminLayout>
-              <AdminUsers />
-            </AdminLayout>
-          </AdminRoute>
+          <AdminLayout>
+            <AdminUsers />
+          </AdminLayout>
         } />
         <Route path="/admin/payments" element={
-          <AdminRoute>
-            <AdminLayout>
-              <AdminPayments />
-            </AdminLayout>
-          </AdminRoute>
+          <AdminLayout>
+            <AdminPayments />
+          </AdminLayout>
         } />
         <Route path="/admin/projects" element={
-          <AdminRoute>
-            <AdminLayout>
-              <AdminUsers />
-            </AdminLayout>
-          </AdminRoute>
+          <AdminLayout>
+            <AdminProjects />
+          </AdminLayout>
         } />
       </Routes>
     </Router>

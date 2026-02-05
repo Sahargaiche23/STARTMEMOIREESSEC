@@ -1,14 +1,49 @@
+import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { 
   Shield, Users, FolderKanban, CreditCard, BarChart3, 
-  Settings, LogOut, Home, ChevronLeft
+  Settings, LogOut, Home
 } from 'lucide-react';
 import useAuthStore from '../store/authStore';
 
 const AdminLayout = ({ children }) => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, logout } = useAuthStore();
+  const [adminUser, setAdminUser] = useState(null);
+
+  useEffect(() => {
+    // Check sessionStorage for admin auth
+    const token = sessionStorage.getItem('admin-token');
+    const userStr = sessionStorage.getItem('admin-user');
+    
+    if (token && userStr) {
+      try {
+        const user = JSON.parse(userStr);
+        if (user.role === 'admin' || user.email === 'admin@startuplab.com') {
+          setAdminUser(user);
+          return;
+        }
+      } catch (e) {}
+    }
+    // Not authorized
+    window.location.href = '/admin/login';
+  }, []);
+
+  const logout = () => {
+    sessionStorage.removeItem('admin-token');
+    sessionStorage.removeItem('admin-user');
+    window.location.href = '/admin/login';
+  };
+
+  if (!adminUser) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-cyan-500"></div>
+      </div>
+    );
+  }
+
+  const user = adminUser;
 
   const menuItems = [
     { path: '/admin', icon: BarChart3, label: 'Tableau de bord' },
@@ -59,17 +94,6 @@ const AdminLayout = ({ children }) => {
             );
           })}
         </nav>
-
-        {/* Back to App */}
-        <div className="p-4 border-t border-slate-700">
-          <Link
-            to="/dashboard"
-            className="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-300 hover:bg-slate-800 hover:text-white transition-all"
-          >
-            <ChevronLeft className="w-5 h-5" />
-            <span className="font-medium">Retour à l'app</span>
-          </Link>
-        </div>
 
         {/* User */}
         <div className="p-4 border-t border-slate-700">

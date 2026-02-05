@@ -3,7 +3,7 @@ import {
   Users, Search, Filter, Edit, Trash2, Eye, UserCheck, UserX,
   ChevronLeft, ChevronRight, Shield, Mail
 } from 'lucide-react';
-import api from '../../utils/api';
+import adminApi from '../../utils/adminApi';
 import toast from 'react-hot-toast';
 
 const AdminUsers = () => {
@@ -31,7 +31,7 @@ const AdminUsers = () => {
         role: roleFilter,
         status: statusFilter
       });
-      const res = await api.get(`/admin/users?${params}`);
+      const res = await adminApi.get(`/admin/users?${params}`);
       setUsers(res.data.users);
       setPagination(res.data.pagination);
     } catch (error) {
@@ -49,7 +49,7 @@ const AdminUsers = () => {
 
   const handleViewUser = async (userId) => {
     try {
-      const res = await api.get(`/admin/users/${userId}`);
+      const res = await adminApi.get(`/admin/users/${userId}`);
       setSelectedUser(res.data);
       setEditMode(false);
       setShowModal(true);
@@ -60,7 +60,7 @@ const AdminUsers = () => {
 
   const handleUpdateUser = async () => {
     try {
-      await api.put(`/admin/users/${selectedUser.user.id}`, {
+      await adminApi.put(`/admin/users/${selectedUser.user.id}`, {
         firstName: selectedUser.user.firstName,
         lastName: selectedUser.user.lastName,
         email: selectedUser.user.email,
@@ -79,7 +79,7 @@ const AdminUsers = () => {
   const handleDeleteUser = async (userId) => {
     if (!confirm('Êtes-vous sûr de vouloir supprimer cet utilisateur ?')) return;
     try {
-      await api.delete(`/admin/users/${userId}`);
+      await adminApi.delete(`/admin/users/${userId}`);
       toast.success('Utilisateur supprimé');
       fetchUsers();
     } catch (error) {
@@ -89,7 +89,7 @@ const AdminUsers = () => {
 
   const toggleUserStatus = async (user) => {
     try {
-      await api.put(`/admin/users/${user.id}`, {
+      await adminApi.put(`/admin/users/${user.id}`, {
         ...user,
         isActive: !user.isActive
       });

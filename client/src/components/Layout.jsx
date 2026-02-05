@@ -13,6 +13,7 @@ import {
   Shield
 } from 'lucide-react';
 import useAuthStore from '../store/authStore';
+import NotificationBell from './NotificationBell';
 
 const Layout = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -131,6 +132,7 @@ const Layout = ({ children }) => {
           </button>
           <div className="flex-1" />
           <div className="flex items-center gap-4">
+            <NotificationBell />
             <span className={`badge ${user?.subscription === 'free' ? 'badge-info' : 'badge-success'}`}>
               {user?.subscription === 'free' ? 'Plan Gratuit' : user?.subscription?.toUpperCase()}
             </span>

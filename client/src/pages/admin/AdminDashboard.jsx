@@ -4,7 +4,7 @@ import {
   Users, FolderKanban, Lightbulb, CreditCard, TrendingUp, 
   Activity, Settings, Shield, UserCheck, UserX, DollarSign
 } from 'lucide-react';
-import api from '../../utils/api';
+import adminApi from '../../utils/adminApi';
 import toast from 'react-hot-toast';
 
 const AdminDashboard = () => {
@@ -19,8 +19,8 @@ const AdminDashboard = () => {
   const fetchData = async () => {
     try {
       const [statsRes, activityRes] = await Promise.all([
-        api.get('/admin/stats'),
-        api.get('/admin/activity')
+        adminApi.get('/admin/stats'),
+        adminApi.get('/admin/activity')
       ]);
       setStats(statsRes.data);
       setActivity(activityRes.data.activities);
