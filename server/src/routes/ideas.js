@@ -111,9 +111,11 @@ router.post('/', authMiddleware, [
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
+      console.log('Validation errors:', errors.array());
       return res.status(400).json({ errors: errors.array() });
     }
 
+    console.log('Saving idea:', req.body);
     const { title, description, problem, solution, targetMarket, industry, score, projectId } = req.body;
 
     const result = db.prepare(`
