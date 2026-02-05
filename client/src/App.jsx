@@ -18,6 +18,11 @@ import Pricing from './pages/Pricing';
 import Profile from './pages/Profile';
 import GoogleCallback from './pages/GoogleCallback';
 import Layout from './components/Layout';
+import AdminLayout from './components/AdminLayout';
+import AdminLogin from './pages/admin/AdminLogin';
+import AdminDashboard from './pages/admin/AdminDashboard';
+import AdminUsers from './pages/admin/AdminUsers';
+import AdminPayments from './pages/admin/AdminPayments';
 
 const ProtectedRoute = ({ children }) => {
   const { isAuthenticated } = useAuthStore();
@@ -34,6 +39,16 @@ const PublicRoute = ({ children }) => {
   
   if (isAuthenticated) {
     return <Navigate to="/dashboard" replace />;
+  }
+  
+  return children;
+};
+
+const AdminRoute = ({ children }) => {
+  const { isAuthenticated, user } = useAuthStore();
+  
+  if (!isAuthenticated || user?.role !== 'admin') {
+    return <Navigate to="/admin/login" replace />;
   }
   
   return children;
@@ -146,6 +161,37 @@ function App() {
               <Profile />
             </Layout>
           </ProtectedRoute>
+        } />
+        
+        {/* Admin Routes */}
+        <Route path="/admin/login" element={<AdminLogin />} />
+        <Route path="/admin" element={
+          <AdminRoute>
+            <AdminLayout>
+              <AdminDashboard />
+            </AdminLayout>
+          </AdminRoute>
+        } />
+        <Route path="/admin/users" element={
+          <AdminRoute>
+            <AdminLayout>
+              <AdminUsers />
+            </AdminLayout>
+          </AdminRoute>
+        } />
+        <Route path="/admin/payments" element={
+          <AdminRoute>
+            <AdminLayout>
+              <AdminPayments />
+            </AdminLayout>
+          </AdminRoute>
+        } />
+        <Route path="/admin/projects" element={
+          <AdminRoute>
+            <AdminLayout>
+              <AdminUsers />
+            </AdminLayout>
+          </AdminRoute>
         } />
       </Routes>
     </Router>

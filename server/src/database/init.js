@@ -17,11 +17,13 @@ db.exec(`
     lastName TEXT NOT NULL,
     phone TEXT,
     company TEXT,
+    role TEXT DEFAULT 'user',
     subscription TEXT DEFAULT 'free',
     googleId TEXT UNIQUE,
     faceDescriptor TEXT,
     avatarUrl TEXT,
     authProvider TEXT DEFAULT 'local',
+    isActive INTEGER DEFAULT 1,
     createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
     updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP
   );

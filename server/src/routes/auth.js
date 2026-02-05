@@ -125,7 +125,7 @@ router.post('/login', [
 router.get('/me', authMiddleware, (req, res) => {
   try {
     const user = db.prepare(`
-      SELECT u.id, u.email, u.firstName, u.lastName, u.phone, u.company, u.subscription, u.avatarUrl,
+      SELECT u.id, u.email, u.firstName, u.lastName, u.phone, u.company, u.subscription, u.avatarUrl, u.role,
              s.plan, s.startDate, s.endDate, s.isActive
       FROM users u
       LEFT JOIN subscriptions s ON u.id = s.userId

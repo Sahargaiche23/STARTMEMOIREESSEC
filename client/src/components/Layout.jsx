@@ -9,7 +9,8 @@ import {
   Menu, 
   X,
   Rocket,
-  CreditCard
+  CreditCard,
+  Shield
 } from 'lucide-react';
 import useAuthStore from '../store/authStore';
 
@@ -80,6 +81,7 @@ const Layout = ({ children }) => {
                 </Link>
               );
             })}
+            
           </nav>
 
           {/* User section */}
