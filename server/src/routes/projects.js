@@ -5,19 +5,43 @@ const { authMiddleware } = require('../middleware/auth');
 
 const router = express.Router();
 
-// Get all projects for user
+// Get all projects for user (owned + team member)
 router.get('/', authMiddleware, (req, res) => {
   try {
-    const projects = db.prepare(`
+    // Get user email for team member check
+    const user = db.prepare('SELECT email FROM users WHERE id = ?').get(req.user.userId);
+    
+    // Get owned projects
+    const ownedProjects = db.prepare(`
       SELECT p.*, 
              (SELECT COUNT(*) FROM tasks WHERE projectId = p.id) as taskCount,
-             (SELECT COUNT(*) FROM tasks WHERE projectId = p.id AND status = 'done') as completedTasks
+             (SELECT COUNT(*) FROM tasks WHERE projectId = p.id AND status = 'done') as completedTasks,
+             'owner' as role
       FROM projects p
       WHERE p.userId = ?
       ORDER BY p.updatedAt DESC
     `).all(req.user.userId);
 
-    res.json({ projects });
+    // Get projects where user is a team member
+    const teamProjects = db.prepare(`
+      SELECT p.*, 
+             (SELECT COUNT(*) FROM tasks WHERE projectId = p.id) as taskCount,
+             (SELECT COUNT(*) FROM tasks WHERE projectId = p.id AND status = 'done') as completedTasks,
+             tm.role as role,
+             u.firstName as ownerFirstName, u.lastName as ownerLastName
+      FROM projects p
+      JOIN team_members tm ON p.id = tm.projectId
+      JOIN users u ON p.userId = u.id
+      WHERE (tm.userId = ? OR tm.email = ?) AND tm.status = 'active'
+      ORDER BY p.updatedAt DESC
+    `).all(req.user.userId, user?.email);
+
+    // Combine and remove duplicates
+    const allProjects = [...ownedProjects, ...teamProjects.filter(tp => 
+      !ownedProjects.some(op => op.id === tp.id)
+    )];
+
+    res.json({ projects: allProjects });
   } catch (error) {
     console.error('Get projects error:', error);
     res.status(500).json({ message: 'Erreur serveur' });
@@ -27,11 +51,32 @@ router.get('/', authMiddleware, (req, res) => {
 // Get single project
 router.get('/:id', authMiddleware, (req, res) => {
   try {
-    const project = db.prepare(`
-      SELECT * FROM projects WHERE id = ? AND userId = ?
+    const user = db.prepare('SELECT email FROM users WHERE id = ?').get(req.user.userId);
+    console.log('GET project - userId:', req.user.userId, 'email:', user?.email, 'projectId:', req.params.id);
+    
+    // Check if user owns the project
+    let project = db.prepare(`
+      SELECT *, 'owner' as userRole FROM projects WHERE id = ? AND userId = ?
     `).get(req.params.id, req.user.userId);
+    console.log('Owner check result:', project ? 'found' : 'not found');
+
+    // If not owner, check if user is a team member
+    if (!project) {
+      const teamMember = db.prepare(`
+        SELECT tm.role FROM team_members tm
+        WHERE tm.projectId = ? AND (tm.userId = ? OR tm.email = ?) AND tm.status = 'active'
+      `).get(req.params.id, req.user.userId, user?.email);
+      console.log('Team member check result:', teamMember);
+      
+      if (teamMember) {
+        project = db.prepare(`SELECT *, ? as userRole FROM projects WHERE id = ?`)
+          .get(teamMember.role, req.params.id);
+        console.log('Project loaded for team member:', project ? 'found' : 'not found');
+      }
+    }
 
     if (!project) {
+      console.log('Project not found - returning 404');
       return res.status(404).json({ message: 'Projet non trouvé' });
     }
 
@@ -58,6 +103,14 @@ router.get('/:id', authMiddleware, (req, res) => {
   }
 });
 
+// Plan limits
+const PLAN_LIMITS = {
+  free: { projects: 1, ideas: 10 },
+  starter: { projects: 5, ideas: 50 },
+  pro: { projects: -1, ideas: -1 },
+  enterprise: { projects: -1, ideas: -1 }
+};
+
 // Create project
 router.post('/', authMiddleware, [
   body('name').notEmpty().withMessage('Le nom du projet est requis')
@@ -66,6 +119,21 @@ router.post('/', authMiddleware, [
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       return res.status(400).json({ errors: errors.array() });
+    }
+
+    // Check subscription limits
+    const user = db.prepare('SELECT subscription FROM users WHERE id = ?').get(req.user.userId);
+    const userPlan = user?.subscription || 'free';
+    const limits = PLAN_LIMITS[userPlan] || PLAN_LIMITS.free;
+    
+    if (limits.projects !== -1) {
+      const projectCount = db.prepare('SELECT COUNT(*) as count FROM projects WHERE userId = ?').get(req.user.userId);
+      if (projectCount.count >= limits.projects) {
+        return res.status(403).json({ 
+          message: `Limite de projets atteinte (${limits.projects}). Passez à un plan supérieur.`,
+          code: 'PROJECT_LIMIT_REACHED'
+        });
+      }
     }
 
     const { name, description, industry, stage } = req.body;
@@ -138,8 +206,23 @@ router.delete('/:id', authMiddleware, (req, res) => {
 // Get project stats
 router.get('/:id/stats', authMiddleware, (req, res) => {
   try {
-    const project = db.prepare('SELECT * FROM projects WHERE id = ? AND userId = ?')
+    const user = db.prepare('SELECT email FROM users WHERE id = ?').get(req.user.userId);
+    
+    // Check if owner
+    let project = db.prepare('SELECT * FROM projects WHERE id = ? AND userId = ?')
       .get(req.params.id, req.user.userId);
+
+    // Check if team member
+    if (!project) {
+      const teamMember = db.prepare(`
+        SELECT tm.role FROM team_members tm
+        WHERE tm.projectId = ? AND (tm.userId = ? OR tm.email = ?) AND tm.status = 'active'
+      `).get(req.params.id, req.user.userId, user?.email);
+      
+      if (teamMember) {
+        project = db.prepare('SELECT * FROM projects WHERE id = ?').get(req.params.id);
+      }
+    }
 
     if (!project) {
       return res.status(404).json({ message: 'Projet non trouvé' });

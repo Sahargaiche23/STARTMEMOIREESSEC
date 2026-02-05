@@ -723,12 +723,15 @@ const Profile = () => {
                           <td className="py-3 text-sm capitalize">{payment.method}</td>
                           <td className="py-3">
                             <span className={`badge ${
-                              payment.status === 'completed' ? 'badge-success' :
+                              payment.status === 'completed' || payment.status === 'approved' ? 'badge-success' :
                               payment.status === 'pending' ? 'badge-warning' :
+                              payment.status === 'rejected' ? 'badge-danger' :
                               'badge-danger'
                             }`}>
                               {payment.status === 'completed' ? 'Payé' :
-                               payment.status === 'pending' ? 'En attente' : 'Échoué'}
+                               payment.status === 'approved' ? 'Approuvé' :
+                               payment.status === 'pending' ? 'En attente' :
+                               payment.status === 'rejected' ? 'Rejeté' : 'Échoué'}
                             </span>
                           </td>
                         </tr>

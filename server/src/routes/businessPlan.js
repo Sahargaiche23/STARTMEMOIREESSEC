@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const db = require('../database/init');
 const { authMiddleware } = require('../middleware/auth');
+const { checkProjectAccess } = require('../middleware/projectAccess');
 
 const router = express.Router();
 
@@ -16,10 +17,8 @@ if (!fs.existsSync(uploadsDir)) {
 // Get business plan for a project
 router.get('/project/:projectId', authMiddleware, (req, res) => {
   try {
-    const project = db.prepare('SELECT * FROM projects WHERE id = ? AND userId = ?')
-      .get(req.params.projectId, req.user.userId);
-
-    if (!project) {
+    const access = checkProjectAccess(req.user.userId, req.params.projectId);
+    if (!access.hasAccess) {
       return res.status(404).json({ message: 'Projet non trouvé' });
     }
 
@@ -36,10 +35,8 @@ router.get('/project/:projectId', authMiddleware, (req, res) => {
 // Save business plan
 router.post('/project/:projectId', authMiddleware, (req, res) => {
   try {
-    const project = db.prepare('SELECT * FROM projects WHERE id = ? AND userId = ?')
-      .get(req.params.projectId, req.user.userId);
-
-    if (!project) {
+    const access = checkProjectAccess(req.user.userId, req.params.projectId, ['owner', 'admin', 'member']);
+    if (!access.hasAccess) {
       return res.status(404).json({ message: 'Projet non trouvé' });
     }
 
@@ -100,12 +97,11 @@ router.post('/project/:projectId', authMiddleware, (req, res) => {
 // Generate PDF
 router.post('/project/:projectId/pdf', authMiddleware, (req, res) => {
   try {
-    const project = db.prepare('SELECT * FROM projects WHERE id = ? AND userId = ?')
-      .get(req.params.projectId, req.user.userId);
-
-    if (!project) {
+    const access = checkProjectAccess(req.user.userId, req.params.projectId);
+    if (!access.hasAccess) {
       return res.status(404).json({ message: 'Projet non trouvé' });
     }
+    const project = access.project;
 
     const businessPlan = db.prepare('SELECT * FROM business_plans WHERE projectId = ?')
       .get(req.params.projectId);

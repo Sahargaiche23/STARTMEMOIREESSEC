@@ -1,6 +1,7 @@
 const express = require('express');
 const db = require('../database/init');
 const { authMiddleware } = require('../middleware/auth');
+const { checkProjectAccess } = require('../middleware/projectAccess');
 
 const router = express.Router();
 
@@ -52,10 +53,8 @@ const slideTemplates = {
 // Get pitch deck for a project
 router.get('/project/:projectId', authMiddleware, (req, res) => {
   try {
-    const project = db.prepare('SELECT * FROM projects WHERE id = ? AND userId = ?')
-      .get(req.params.projectId, req.user.userId);
-
-    if (!project) {
+    const access = checkProjectAccess(req.user.userId, req.params.projectId);
+    if (!access.hasAccess) {
       return res.status(404).json({ message: 'Projet non trouvé' });
     }
 
@@ -76,12 +75,11 @@ router.get('/project/:projectId', authMiddleware, (req, res) => {
 // Create pitch deck from template
 router.post('/project/:projectId/create', authMiddleware, (req, res) => {
   try {
-    const project = db.prepare('SELECT * FROM projects WHERE id = ? AND userId = ?')
-      .get(req.params.projectId, req.user.userId);
-
-    if (!project) {
+    const access = checkProjectAccess(req.user.userId, req.params.projectId, ['owner', 'admin', 'member']);
+    if (!access.hasAccess) {
       return res.status(404).json({ message: 'Projet non trouvé' });
     }
+    const project = access.project;
 
     const { template } = req.body;
     const selectedTemplate = slideTemplates[template] || slideTemplates.modern;
@@ -140,10 +138,8 @@ router.post('/project/:projectId/create', authMiddleware, (req, res) => {
 // Update slides
 router.put('/project/:projectId/slides', authMiddleware, (req, res) => {
   try {
-    const project = db.prepare('SELECT * FROM projects WHERE id = ? AND userId = ?')
-      .get(req.params.projectId, req.user.userId);
-
-    if (!project) {
+    const access = checkProjectAccess(req.user.userId, req.params.projectId, ['owner', 'admin', 'member']);
+    if (!access.hasAccess) {
       return res.status(404).json({ message: 'Projet non trouvé' });
     }
 

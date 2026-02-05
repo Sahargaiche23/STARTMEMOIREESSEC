@@ -148,6 +148,7 @@ db.exec(`
     email TEXT NOT NULL,
     role TEXT DEFAULT 'member',
     status TEXT DEFAULT 'pending',
+    inviteToken TEXT,
     createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (projectId) REFERENCES projects(id) ON DELETE CASCADE,
     FOREIGN KEY (userId) REFERENCES users(id) ON DELETE SET NULL

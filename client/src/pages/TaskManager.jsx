@@ -31,8 +31,10 @@ const TaskManager = () => {
     description: '',
     priority: 'medium',
     dueDate: '',
-    status: 'todo'
+    status: 'todo',
+    assignedTo: ''
   });
+  const [teamMembers, setTeamMembers] = useState([]);
 
   useEffect(() => {
     fetchData();
@@ -40,13 +42,15 @@ const TaskManager = () => {
 
   const fetchData = async () => {
     try {
-      const [projectRes, kanbanRes] = await Promise.all([
+      const [projectRes, kanbanRes, membersRes] = await Promise.all([
         api.get(`/projects/${projectId}`),
-        api.get(`/tasks/project/${projectId}/kanban`)
+        api.get(`/tasks/project/${projectId}/kanban`),
+        api.get(`/team-members/${projectId}`)
       ]);
 
       setProject(projectRes.data.project);
       setColumns(kanbanRes.data.columns);
+      setTeamMembers(membersRes.data.members || []);
     } catch (error) {
       toast.error('Erreur lors du chargement');
     } finally {
@@ -99,7 +103,8 @@ const TaskManager = () => {
         description: task.description || '',
         priority: task.priority || 'medium',
         dueDate: task.dueDate ? task.dueDate.split('T')[0] : '',
-        status: task.status
+        status: task.status,
+        assignedTo: task.assignedTo || ''
       });
     } else {
       setEditingTask(null);
@@ -108,7 +113,8 @@ const TaskManager = () => {
         description: '',
         priority: 'medium',
         dueDate: '',
-        status
+        status,
+        assignedTo: ''
       });
     }
     setShowModal(true);
@@ -117,7 +123,16 @@ const TaskManager = () => {
   const closeModal = () => {
     setShowModal(false);
     setEditingTask(null);
-    setFormData({ title: '', description: '', priority: 'medium', dueDate: '', status: 'todo' });
+    setFormData({ title: '', description: '', priority: 'medium', dueDate: '', status: 'todo', assignedTo: '' });
+  };
+
+  const getAssigneeName = (assignedTo) => {
+    if (!assignedTo) return null;
+    const member = teamMembers.find(m => m.userId === assignedTo || m.id === assignedTo);
+    if (member) {
+      return member.firstName ? `${member.firstName} ${member.lastName?.[0] || ''}` : member.email.split('@')[0];
+    }
+    return null;
   };
 
   const priorityColors = {
@@ -230,6 +245,12 @@ const TaskManager = () => {
                       <span className="badge bg-gray-100 text-gray-700">
                         <Calendar className="w-3 h-3 mr-1" />
                         {new Date(task.dueDate).toLocaleDateString('fr-FR')}
+                      </span>
+                    )}
+                    {task.assignedTo && getAssigneeName(task.assignedTo) && (
+                      <span className="badge bg-indigo-100 text-indigo-700">
+                        <User className="w-3 h-3 mr-1" />
+                        {getAssigneeName(task.assignedTo)}
                       </span>
                     )}
                   </div>
@@ -345,19 +366,39 @@ const TaskManager = () => {
                 </div>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Statut
-                </label>
-                <select
-                  value={formData.status}
-                  onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                  className="input-field"
-                >
-                  <option value="todo">À faire</option>
-                  <option value="in_progress">En cours</option>
-                  <option value="done">Terminé</option>
-                </select>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Statut
+                  </label>
+                  <select
+                    value={formData.status}
+                    onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                    className="input-field"
+                  >
+                    <option value="todo">À faire</option>
+                    <option value="in_progress">En cours</option>
+                    <option value="done">Terminé</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Assigné à
+                  </label>
+                  <select
+                    value={formData.assignedTo}
+                    onChange={(e) => setFormData({ ...formData, assignedTo: e.target.value })}
+                    className="input-field"
+                  >
+                    <option value="">Non assigné</option>
+                    {teamMembers.filter(m => m.status === 'active').map((member) => (
+                      <option key={member.id} value={member.userId || member.id}>
+                        {member.firstName ? `${member.firstName} ${member.lastName || ''}` : member.email}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
               <div className="flex gap-3 pt-4">

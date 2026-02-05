@@ -2,6 +2,7 @@ const express = require('express');
 const { body, validationResult } = require('express-validator');
 const db = require('../database/init');
 const { authMiddleware } = require('../middleware/auth');
+const { checkProjectAccess } = require('../middleware/projectAccess');
 
 const router = express.Router();
 
@@ -45,10 +46,8 @@ const canvasTemplates = {
 // Get business model for a project
 router.get('/project/:projectId', authMiddleware, (req, res) => {
   try {
-    const project = db.prepare('SELECT * FROM projects WHERE id = ? AND userId = ?')
-      .get(req.params.projectId, req.user.userId);
-
-    if (!project) {
+    const access = checkProjectAccess(req.user.userId, req.params.projectId);
+    if (!access.hasAccess) {
       return res.status(404).json({ message: 'Projet non trouvé' });
     }
 
@@ -67,10 +66,8 @@ router.post('/generate', authMiddleware, (req, res) => {
   try {
     const { projectId, template, customData } = req.body;
 
-    const project = db.prepare('SELECT * FROM projects WHERE id = ? AND userId = ?')
-      .get(projectId, req.user.userId);
-
-    if (!project) {
+    const access = checkProjectAccess(req.user.userId, projectId, ['owner', 'admin', 'member']);
+    if (!access.hasAccess) {
       return res.status(404).json({ message: 'Projet non trouvé' });
     }
 
@@ -92,10 +89,8 @@ router.post('/generate', authMiddleware, (req, res) => {
 // Save or update business model
 router.post('/project/:projectId', authMiddleware, (req, res) => {
   try {
-    const project = db.prepare('SELECT * FROM projects WHERE id = ? AND userId = ?')
-      .get(req.params.projectId, req.user.userId);
-
-    if (!project) {
+    const access = checkProjectAccess(req.user.userId, req.params.projectId, ['owner', 'admin', 'member']);
+    if (!access.hasAccess) {
       return res.status(404).json({ message: 'Projet non trouvé' });
     }
 

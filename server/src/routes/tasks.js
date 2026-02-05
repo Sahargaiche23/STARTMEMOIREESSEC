@@ -2,16 +2,15 @@ const express = require('express');
 const { body, validationResult } = require('express-validator');
 const db = require('../database/init');
 const { authMiddleware } = require('../middleware/auth');
+const { checkProjectAccess } = require('../middleware/projectAccess');
 
 const router = express.Router();
 
 // Get all tasks for a project
 router.get('/project/:projectId', authMiddleware, (req, res) => {
   try {
-    const project = db.prepare('SELECT * FROM projects WHERE id = ? AND userId = ?')
-      .get(req.params.projectId, req.user.userId);
-
-    if (!project) {
+    const access = checkProjectAccess(req.user.userId, req.params.projectId);
+    if (!access.hasAccess) {
       return res.status(404).json({ message: 'Projet non trouvé' });
     }
 
@@ -39,10 +38,8 @@ router.get('/project/:projectId', authMiddleware, (req, res) => {
 // Get tasks by status (Kanban view)
 router.get('/project/:projectId/kanban', authMiddleware, (req, res) => {
   try {
-    const project = db.prepare('SELECT * FROM projects WHERE id = ? AND userId = ?')
-      .get(req.params.projectId, req.user.userId);
-
-    if (!project) {
+    const access = checkProjectAccess(req.user.userId, req.params.projectId);
+    if (!access.hasAccess) {
       return res.status(404).json({ message: 'Projet non trouvé' });
     }
 
@@ -90,11 +87,9 @@ router.post('/project/:projectId', authMiddleware, [
       return res.status(400).json({ errors: errors.array() });
     }
 
-    const project = db.prepare('SELECT * FROM projects WHERE id = ? AND userId = ?')
-      .get(req.params.projectId, req.user.userId);
-
-    if (!project) {
-      return res.status(404).json({ message: 'Projet non trouvé' });
+    const access = checkProjectAccess(req.user.userId, req.params.projectId, ['owner', 'admin', 'member']);
+    if (!access.hasAccess) {
+      return res.status(404).json({ message: 'Projet non trouvé ou accès refusé' });
     }
 
     const { title, description, status, priority, dueDate, assignedTo } = req.body;
@@ -123,14 +118,15 @@ router.post('/project/:projectId', authMiddleware, [
 // Update task
 router.put('/:id', authMiddleware, (req, res) => {
   try {
-    const task = db.prepare(`
-      SELECT t.* FROM tasks t
-      JOIN projects p ON t.projectId = p.id
-      WHERE t.id = ? AND p.userId = ?
-    `).get(req.params.id, req.user.userId);
-
+    // Get task first
+    const task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(req.params.id);
     if (!task) {
       return res.status(404).json({ message: 'Tâche non trouvée' });
+    }
+    
+    const access = checkProjectAccess(req.user.userId, task.projectId, ['owner', 'admin', 'member']);
+    if (!access.hasAccess) {
+      return res.status(403).json({ message: 'Accès refusé' });
     }
 
     const { title, description, status, priority, dueDate, assignedTo } = req.body;
@@ -161,14 +157,14 @@ router.put('/:id', authMiddleware, (req, res) => {
 // Update task status (quick update)
 router.patch('/:id/status', authMiddleware, (req, res) => {
   try {
-    const task = db.prepare(`
-      SELECT t.* FROM tasks t
-      JOIN projects p ON t.projectId = p.id
-      WHERE t.id = ? AND p.userId = ?
-    `).get(req.params.id, req.user.userId);
-
+    const task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(req.params.id);
     if (!task) {
       return res.status(404).json({ message: 'Tâche non trouvée' });
+    }
+    
+    const access = checkProjectAccess(req.user.userId, task.projectId, ['owner', 'admin', 'member']);
+    if (!access.hasAccess) {
+      return res.status(403).json({ message: 'Accès refusé' });
     }
 
     const { status } = req.body;
@@ -188,17 +184,17 @@ router.patch('/:id/status', authMiddleware, (req, res) => {
   }
 });
 
-// Delete task
+// Delete task (owner/admin/member can delete tasks)
 router.delete('/:id', authMiddleware, (req, res) => {
   try {
-    const task = db.prepare(`
-      SELECT t.* FROM tasks t
-      JOIN projects p ON t.projectId = p.id
-      WHERE t.id = ? AND p.userId = ?
-    `).get(req.params.id, req.user.userId);
-
+    const task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(req.params.id);
     if (!task) {
       return res.status(404).json({ message: 'Tâche non trouvée' });
+    }
+    
+    const access = checkProjectAccess(req.user.userId, task.projectId, ['owner', 'admin', 'member']);
+    if (!access.hasAccess) {
+      return res.status(403).json({ message: 'Accès refusé' });
     }
 
     db.prepare('DELETE FROM tasks WHERE id = ?').run(req.params.id);

@@ -1,6 +1,7 @@
 const express = require('express');
 const db = require('../database/init');
 const { authMiddleware } = require('../middleware/auth');
+const { checkProjectAccess } = require('../middleware/projectAccess');
 
 const router = express.Router();
 
@@ -107,33 +108,73 @@ router.post('/generate-logo', authMiddleware, (req, res) => {
     const logoSuggestions = [
       {
         type: 'Monogramme',
+        logoType: 'monogram',
         description: `Les initiales "${companyName?.substring(0, 2).toUpperCase() || 'AB'}" stylisées`,
         style: 'Moderne et minimaliste',
-        colors: colorPalettes[0]
+        colors: { primary: '#6366F1', secondary: '#EC4899', accent: '#14B8A6' }
       },
       {
         type: 'Icône abstraite',
-        description: 'Forme géométrique représentant l\'innovation',
+        logoType: 'abstract',
+        description: 'Cercles concentriques représentant l\'innovation',
         style: 'Tech et professionnel',
-        colors: colorPalettes[1]
+        colors: { primary: '#1E40AF', secondary: '#3B82F6', accent: '#F59E0B' }
       },
       {
-        type: 'Typographique',
-        description: `Le nom "${companyName || 'Startup'}" avec une typographie unique`,
-        style: 'Élégant et mémorable',
-        colors: colorPalettes[4]
+        type: 'Géométrique',
+        logoType: 'geometric',
+        description: 'Forme carrée rotative dynamique',
+        style: 'Bold et impactant',
+        colors: { primary: '#7C3AED', secondary: '#A855F7', accent: '#F472B6' }
       },
       {
-        type: 'Mascotte',
-        description: 'Un personnage ou symbole représentant la marque',
-        style: 'Amical et accessible',
-        colors: colorPalettes[2]
+        type: 'Dégradé',
+        logoType: 'gradient',
+        description: 'Logo avec effet dégradé moderne',
+        style: 'Tendance et vibrant',
+        colors: { primary: '#F97316', secondary: '#EC4899', accent: '#FBBF24' }
       },
       {
-        type: 'Emblème',
-        description: 'Logo combinant icône et texte dans un badge',
-        style: 'Classique et confiance',
-        colors: colorPalettes[5]
+        type: 'Contour',
+        logoType: 'outline',
+        description: 'Style ligne fine et épuré',
+        style: 'Minimaliste et élégant',
+        colors: { primary: '#18181B', secondary: '#71717A', accent: '#3B82F6' }
+      },
+      {
+        type: 'Cercle',
+        logoType: 'circle',
+        description: 'Logo circulaire harmonieux',
+        style: 'Équilibré et accessible',
+        colors: { primary: '#059669', secondary: '#84CC16', accent: '#22D3EE' }
+      },
+      {
+        type: 'Hexagone',
+        logoType: 'hexagon',
+        description: 'Forme hexagonale tech',
+        style: 'Moderne et structuré',
+        colors: { primary: '#0891B2', secondary: '#06B6D4', accent: '#14B8A6' }
+      },
+      {
+        type: 'Bouclier',
+        logoType: 'shield',
+        description: 'Emblème de confiance',
+        style: 'Sécurité et fiabilité',
+        colors: { primary: '#1E3A8A', secondary: '#3B82F6', accent: '#F59E0B' }
+      },
+      {
+        type: 'Vague',
+        logoType: 'wave',
+        description: 'Design fluide et dynamique',
+        style: 'Créatif et énergique',
+        colors: { primary: '#8B5CF6', secondary: '#C084FC', accent: '#F472B6' }
+      },
+      {
+        type: 'Minimal',
+        logoType: 'minimal',
+        description: 'Ultra minimaliste avec accent',
+        style: 'Sophistiqué et moderne',
+        colors: { primary: '#374151', secondary: '#F43F5E', accent: '#F43F5E' }
       }
     ];
 
@@ -147,10 +188,8 @@ router.post('/generate-logo', authMiddleware, (req, res) => {
 // Get branding for a project
 router.get('/project/:projectId', authMiddleware, (req, res) => {
   try {
-    const project = db.prepare('SELECT * FROM projects WHERE id = ? AND userId = ?')
-      .get(req.params.projectId, req.user.userId);
-
-    if (!project) {
+    const access = checkProjectAccess(req.user.userId, req.params.projectId);
+    if (!access.hasAccess) {
       return res.status(404).json({ message: 'Projet non trouvé' });
     }
 
@@ -167,10 +206,8 @@ router.get('/project/:projectId', authMiddleware, (req, res) => {
 // Save branding for a project
 router.post('/project/:projectId', authMiddleware, (req, res) => {
   try {
-    const project = db.prepare('SELECT * FROM projects WHERE id = ? AND userId = ?')
-      .get(req.params.projectId, req.user.userId);
-
-    if (!project) {
+    const access = checkProjectAccess(req.user.userId, req.params.projectId, ['owner', 'admin', 'member']);
+    if (!access.hasAccess) {
       return res.status(404).json({ message: 'Projet non trouvé' });
     }
 

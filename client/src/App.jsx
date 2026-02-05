@@ -13,7 +13,10 @@ import BusinessModel from './pages/BusinessModel';
 import Branding from './pages/Branding';
 import BusinessPlan from './pages/BusinessPlan';
 import PitchDeck from './pages/PitchDeck';
+import PitchDeckEditor from './pages/PitchDeckEditor';
 import TaskManager from './pages/TaskManager';
+import TeamMembers from './pages/TeamMembers';
+import InviteRegister from './pages/InviteRegister';
 import Pricing from './pages/Pricing';
 import Profile from './pages/Profile';
 import GoogleCallback from './pages/GoogleCallback';
@@ -95,6 +98,7 @@ function App() {
         } />
         <Route path="/pricing" element={<Pricing />} />
         <Route path="/auth/google/callback" element={<GoogleCallback />} />
+        <Route path="/invite/:token" element={<InviteRegister />} />
         
         <Route path="/dashboard" element={
           <ProtectedRoute>
@@ -147,6 +151,11 @@ function App() {
         } />
         <Route path="/pitch-deck/:projectId" element={
           <ProtectedRoute>
+            <PitchDeckEditor />
+          </ProtectedRoute>
+        } />
+        <Route path="/pitch-deck-old/:projectId" element={
+          <ProtectedRoute>
             <Layout>
               <PitchDeck />
             </Layout>
@@ -156,6 +165,13 @@ function App() {
           <ProtectedRoute>
             <Layout>
               <TaskManager />
+            </Layout>
+          </ProtectedRoute>
+        } />
+        <Route path="/team/:id" element={
+          <ProtectedRoute>
+            <Layout>
+              <TeamMembers />
             </Layout>
           </ProtectedRoute>
         } />

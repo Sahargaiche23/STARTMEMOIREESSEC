@@ -424,4 +424,109 @@ router.get('/face/status', authMiddleware, (req, res) => {
   }
 });
 
+// Verify invitation token
+router.get('/invite/:token', (req, res) => {
+  try {
+    const { token } = req.params;
+    
+    const invitation = db.prepare(`
+      SELECT tm.*, p.name as projectName, p.id as projectId
+      FROM team_members tm
+      JOIN projects p ON tm.projectId = p.id
+      WHERE tm.inviteToken = ? AND tm.status = 'pending'
+    `).get(token);
+    
+    if (!invitation) {
+      return res.status(404).json({ message: 'Invitation invalide ou expirée' });
+    }
+    
+    res.json({
+      email: invitation.email,
+      projectName: invitation.projectName,
+      role: invitation.role
+    });
+  } catch (error) {
+    console.error('Verify invite error:', error);
+    res.status(500).json({ message: 'Erreur serveur' });
+  }
+});
+
+// Register via invitation
+router.post('/invite/:token/register', [
+  body('password').isLength({ min: 6 }).withMessage('Le mot de passe doit contenir au moins 6 caractères'),
+  body('firstName').notEmpty().withMessage('Le prénom est requis'),
+  body('lastName').notEmpty().withMessage('Le nom est requis')
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const { token } = req.params;
+    const { password, firstName, lastName } = req.body;
+    
+    // Find invitation
+    const invitation = db.prepare(`
+      SELECT tm.*, p.name as projectName
+      FROM team_members tm
+      JOIN projects p ON tm.projectId = p.id
+      WHERE tm.inviteToken = ? AND tm.status = 'pending'
+    `).get(token);
+    
+    if (!invitation) {
+      return res.status(404).json({ message: 'Invitation invalide ou expirée' });
+    }
+    
+    // Check if email already registered
+    const existingUser = db.prepare('SELECT id FROM users WHERE email = ?').get(invitation.email);
+    if (existingUser) {
+      return res.status(400).json({ message: 'Cet email est déjà utilisé. Connectez-vous.' });
+    }
+    
+    // Hash password
+    const hashedPassword = await bcrypt.hash(password, 10);
+    
+    // Create user
+    const result = db.prepare(`
+      INSERT INTO users (email, password, firstName, lastName)
+      VALUES (?, ?, ?, ?)
+    `).run(invitation.email, hashedPassword, firstName, lastName);
+    
+    const userId = result.lastInsertRowid;
+    
+    // Create subscription
+    db.prepare('INSERT INTO subscriptions (userId, plan) VALUES (?, ?)').run(userId, 'free');
+    
+    // Update team member with userId and activate
+    db.prepare(`
+      UPDATE team_members SET userId = ?, status = 'active', inviteToken = NULL
+      WHERE id = ?
+    `).run(userId, invitation.id);
+    
+    // Generate token
+    const jwtToken = jwt.sign(
+      { userId, email: invitation.email },
+      process.env.JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+    
+    res.status(201).json({
+      message: 'Compte créé avec succès',
+      token: jwtToken,
+      user: {
+        id: userId,
+        email: invitation.email,
+        firstName,
+        lastName,
+        subscription: 'free'
+      },
+      projectId: invitation.projectId
+    });
+  } catch (error) {
+    console.error('Invite register error:', error);
+    res.status(500).json({ message: 'Erreur serveur' });
+  }
+});
+
 module.exports = router;

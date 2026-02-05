@@ -80,6 +80,14 @@ const ProjectDetail = () => {
       href: `/tasks/${id}`,
       color: 'bg-orange-500',
       completed: false
+    },
+    {
+      name: 'Membres d\'équipe',
+      description: 'Gérez votre équipe et assignez des tâches',
+      icon: Users,
+      href: `/team/${id}`,
+      color: 'bg-indigo-500',
+      completed: false
     }
   ];
 

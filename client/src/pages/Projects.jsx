@@ -10,12 +10,16 @@ import {
   Clock,
   Users,
   CheckCircle,
-  X
+  X,
+  Lock
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../utils/api';
+import useAuthStore from '../store/authStore';
+import { canCreateProject, getPlanLimits } from '../utils/subscription';
 
 const Projects = () => {
+  const { user } = useAuthStore();
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -27,6 +31,10 @@ const Projects = () => {
     industry: '',
     stage: 'idea'
   });
+
+  const userPlan = user?.subscription || 'free';
+  const limits = getPlanLimits(userPlan);
+  const canCreate = canCreateProject(userPlan, projects.length);
 
   useEffect(() => {
     fetchProjects();
@@ -131,12 +139,26 @@ const Projects = () => {
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Mes Projets</h1>
-          <p className="text-gray-600">Gérez tous vos projets de startup en un seul endroit.</p>
+          <p className="text-gray-600">
+            Gérez tous vos projets de startup en un seul endroit.
+            {limits.projects !== -1 && (
+              <span className="ml-2 text-sm">
+                ({projects.length}/{limits.projects} projets)
+              </span>
+            )}
+          </p>
         </div>
-        <button onClick={() => openModal()} className="btn-primary flex items-center gap-2">
-          <Plus className="w-5 h-5" />
-          Nouveau projet
-        </button>
+        {canCreate ? (
+          <button onClick={() => openModal()} className="btn-primary flex items-center gap-2">
+            <Plus className="w-5 h-5" />
+            Nouveau projet
+          </button>
+        ) : (
+          <Link to="/pricing" className="btn-secondary flex items-center gap-2">
+            <Lock className="w-5 h-5" />
+            Limite atteinte - Upgrader
+          </Link>
+        )}
       </div>
 
       {/* Search */}
@@ -156,33 +178,46 @@ const Projects = () => {
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredProjects.map((project) => (
             <div key={project.id} className="card group relative">
-              <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                <div className="flex gap-1">
-                  <button 
-                    onClick={() => openModal(project)}
-                    className="p-2 text-gray-500 hover:text-primary-600 hover:bg-gray-100 rounded-lg"
-                  >
-                    <Edit className="w-4 h-4" />
-                  </button>
-                  <button 
-                    onClick={() => handleDelete(project.id)}
-                    className="p-2 text-gray-500 hover:text-red-600 hover:bg-gray-100 rounded-lg"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+              {project.role === 'owner' && (
+                <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="flex gap-1">
+                    <button 
+                      onClick={() => openModal(project)}
+                      className="p-2 text-gray-500 hover:text-primary-600 hover:bg-gray-100 rounded-lg"
+                    >
+                      <Edit className="w-4 h-4" />
+                    </button>
+                    <button 
+                      onClick={() => handleDelete(project.id)}
+                      className="p-2 text-gray-500 hover:text-red-600 hover:bg-gray-100 rounded-lg"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
-              </div>
+              )}
 
               <Link to={`/projects/${project.id}`}>
                 <div className="flex items-start gap-4 mb-4">
-                  <div className="w-12 h-12 bg-primary-100 rounded-xl flex items-center justify-center">
-                    <FolderOpen className="w-6 h-6 text-primary-600" />
+                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${project.role !== 'owner' ? 'bg-indigo-100' : 'bg-primary-100'}`}>
+                    {project.role !== 'owner' ? (
+                      <Users className="w-6 h-6 text-indigo-600" />
+                    ) : (
+                      <FolderOpen className="w-6 h-6 text-primary-600" />
+                    )}
                   </div>
                   <div className="flex-1 min-w-0">
                     <h3 className="font-semibold text-gray-900 truncate">{project.name}</h3>
-                    <span className={`badge mt-1 ${stages.find(s => s.value === project.stage)?.color || 'badge-info'}`}>
-                      {stages.find(s => s.value === project.stage)?.label || project.stage}
-                    </span>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className={`badge ${stages.find(s => s.value === project.stage)?.color || 'badge-info'}`}>
+                        {stages.find(s => s.value === project.stage)?.label || project.stage}
+                      </span>
+                      {project.role !== 'owner' && (
+                        <span className="badge bg-indigo-100 text-indigo-700">
+                          {project.role === 'admin' ? 'Admin' : project.role === 'member' ? 'Membre' : 'Lecteur'}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
 

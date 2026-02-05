@@ -17,11 +17,13 @@ const Branding = () => {
     companyName: '',
     slogan: '',
     logoUrl: '',
+    logoStyle: null,
     primaryColor: '#0ea5e9',
     secondaryColor: '#d946ef',
     fontFamily: 'Inter',
     brandVoice: ''
   });
+  const [selectedLogo, setSelectedLogo] = useState(null);
 
   useEffect(() => {
     fetchData();
@@ -111,6 +113,153 @@ const Branding = () => {
     'Inter', 'Roboto', 'Open Sans', 'Lato', 'Montserrat', 
     'Poppins', 'Raleway', 'Playfair Display', 'Merriweather'
   ];
+
+  // Render different logo styles based on suggestion type
+  const renderLogoPreview = (suggestion, companyName) => {
+    const initials = companyName?.substring(0, 2).toUpperCase() || 'SU';
+    const firstLetter = companyName?.charAt(0).toUpperCase() || 'S';
+    
+    switch (suggestion.logoType) {
+      case 'monogram':
+        return (
+          <div 
+            className="w-16 h-16 mx-auto mb-3 rounded-xl flex items-center justify-center text-white font-bold text-2xl"
+            style={{ backgroundColor: suggestion.colors.primary }}
+          >
+            {initials}
+          </div>
+        );
+      case 'abstract':
+        return (
+          <div className="w-16 h-16 mx-auto mb-3 relative">
+            <div 
+              className="absolute inset-0 rounded-full opacity-80"
+              style={{ backgroundColor: suggestion.colors.primary }}
+            />
+            <div 
+              className="absolute inset-2 rounded-full"
+              style={{ backgroundColor: suggestion.colors.secondary }}
+            />
+            <div 
+              className="absolute inset-4 rounded-full bg-white flex items-center justify-center font-bold"
+              style={{ color: suggestion.colors.primary }}
+            >
+              {firstLetter}
+            </div>
+          </div>
+        );
+      case 'geometric':
+        return (
+          <div className="w-16 h-16 mx-auto mb-3 relative flex items-center justify-center">
+            <div 
+              className="absolute w-12 h-12 rotate-45"
+              style={{ backgroundColor: suggestion.colors.primary }}
+            />
+            <span className="relative z-10 text-white font-bold text-xl">{firstLetter}</span>
+          </div>
+        );
+      case 'gradient':
+        return (
+          <div 
+            className="w-16 h-16 mx-auto mb-3 rounded-2xl flex items-center justify-center text-white font-bold text-2xl"
+            style={{ 
+              background: `linear-gradient(135deg, ${suggestion.colors.primary}, ${suggestion.colors.secondary})` 
+            }}
+          >
+            {initials}
+          </div>
+        );
+      case 'outline':
+        return (
+          <div 
+            className="w-16 h-16 mx-auto mb-3 rounded-xl flex items-center justify-center font-bold text-2xl border-4"
+            style={{ 
+              borderColor: suggestion.colors.primary,
+              color: suggestion.colors.primary
+            }}
+          >
+            {initials}
+          </div>
+        );
+      case 'circle':
+        return (
+          <div 
+            className="w-16 h-16 mx-auto mb-3 rounded-full flex items-center justify-center text-white font-bold text-2xl"
+            style={{ backgroundColor: suggestion.colors.primary }}
+          >
+            {initials}
+          </div>
+        );
+      case 'hexagon':
+        return (
+          <div className="w-16 h-16 mx-auto mb-3 flex items-center justify-center">
+            <svg viewBox="0 0 100 100" className="w-full h-full">
+              <polygon 
+                points="50,5 95,27.5 95,72.5 50,95 5,72.5 5,27.5" 
+                fill={suggestion.colors.primary}
+              />
+              <text x="50" y="58" textAnchor="middle" fill="white" fontSize="28" fontWeight="bold">
+                {initials}
+              </text>
+            </svg>
+          </div>
+        );
+      case 'shield':
+        return (
+          <div className="w-16 h-16 mx-auto mb-3 flex items-center justify-center">
+            <svg viewBox="0 0 100 120" className="w-full h-full">
+              <path 
+                d="M50,5 L95,20 L95,60 Q95,100 50,115 Q5,100 5,60 L5,20 Z" 
+                fill={suggestion.colors.primary}
+              />
+              <text x="50" y="70" textAnchor="middle" fill="white" fontSize="28" fontWeight="bold">
+                {initials}
+              </text>
+            </svg>
+          </div>
+        );
+      case 'wave':
+        return (
+          <div 
+            className="w-16 h-16 mx-auto mb-3 rounded-xl flex items-center justify-center text-white font-bold text-2xl overflow-hidden relative"
+            style={{ backgroundColor: suggestion.colors.primary }}
+          >
+            <div 
+              className="absolute bottom-0 left-0 right-0 h-6 opacity-50"
+              style={{ 
+                backgroundColor: suggestion.colors.secondary,
+                borderRadius: '100% 100% 0 0'
+              }}
+            />
+            <span className="relative z-10">{initials}</span>
+          </div>
+        );
+      case 'minimal':
+        return (
+          <div className="w-16 h-16 mx-auto mb-3 flex items-center justify-center">
+            <span 
+              className="text-4xl font-light"
+              style={{ color: suggestion.colors.primary }}
+            >
+              {firstLetter}
+            </span>
+            <div 
+              className="w-2 h-2 rounded-full ml-1"
+              style={{ backgroundColor: suggestion.colors.secondary }}
+            />
+          </div>
+        );
+      default:
+        return (
+          <div 
+            className="w-16 h-16 mx-auto mb-3 rounded-xl flex items-center justify-center text-white font-bold text-2xl"
+            style={{ backgroundColor: suggestion.colors.primary }}
+          >
+            {initials}
+          </div>
+        );
+    }
+  };
 
   if (loading) {
     return (
@@ -320,18 +469,34 @@ const Branding = () => {
           </div>
 
           {logoSuggestions.length > 0 ? (
-            <div className="grid md:grid-cols-3 lg:grid-cols-5 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
               {logoSuggestions.map((suggestion, i) => (
-                <div key={i} className="p-4 bg-gray-50 rounded-xl text-center">
-                  <div 
-                    className="w-16 h-16 mx-auto mb-3 rounded-xl flex items-center justify-center text-white font-bold text-2xl"
-                    style={{ backgroundColor: suggestion.colors.primary }}
-                  >
-                    {branding.companyName?.substring(0, 2).toUpperCase() || 'SU'}
+                <button
+                  key={i}
+                  onClick={() => {
+                    setSelectedLogo(i);
+                    setBranding({ 
+                      ...branding, 
+                      logoStyle: suggestion,
+                      primaryColor: suggestion.colors.primary,
+                      secondaryColor: suggestion.colors.secondary
+                    });
+                    toast.success(`Style "${suggestion.type}" sélectionné !`);
+                  }}
+                  className={`p-4 rounded-xl text-center transition-all cursor-pointer hover:scale-105 h-40 flex flex-col items-center justify-center ${
+                    selectedLogo === i 
+                      ? 'ring-2 ring-primary-500 bg-primary-50 shadow-lg' 
+                      : 'bg-gray-50 hover:bg-gray-100 border border-gray-200'
+                  }`}
+                >
+                  <div className="flex-1 flex items-center justify-center w-full">
+                    {renderLogoPreview(suggestion, branding.companyName)}
                   </div>
-                  <p className="font-medium text-gray-900 text-sm">{suggestion.type}</p>
-                  <p className="text-xs text-gray-500 mt-1">{suggestion.style}</p>
-                </div>
+                  <div className="mt-auto pt-2">
+                    <p className="font-medium text-gray-900 text-sm">{suggestion.type}</p>
+                    <p className="text-xs text-gray-500">{suggestion.style}</p>
+                  </div>
+                </button>
               ))}
             </div>
           ) : (
