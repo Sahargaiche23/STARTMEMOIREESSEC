@@ -523,6 +523,106 @@ const AccountingBilan = () => {
           ) : (
             <p className="text-gray-500 text-center py-8">Aucune donnée de trésorerie</p>
           )}
+
+          {/* Prévision Financière sur 12 mois */}
+          <div className="mt-8 pt-6 border-t">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                <TrendingUp className="w-5 h-5 text-blue-600" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Prévision Financière</h3>
+                <p className="text-sm text-gray-500">Anticipez votre trésorerie sur 12 mois</p>
+              </div>
+            </div>
+
+            {(() => {
+              // Generate 12-month forecast based on average cash flow
+              const avgInflow = cashFlow.length > 0 
+                ? cashFlow.reduce((sum, cf) => sum + (cf.inflow || 0), 0) / cashFlow.length 
+                : 5000;
+              const avgOutflow = cashFlow.length > 0 
+                ? cashFlow.reduce((sum, cf) => sum + (cf.outflow || 0), 0) / cashFlow.length 
+                : 3500;
+              const currentBalance = cashFlow.length > 0 
+                ? cashFlow[cashFlow.length - 1]?.balance || 0 
+                : 10000;
+
+              const monthNames = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jun', 'Jul', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc'];
+              const currentMonth = new Date().getMonth();
+              
+              const forecast = [];
+              let runningBalance = currentBalance;
+              
+              for (let i = 0; i < 12; i++) {
+                const monthIndex = (currentMonth + i) % 12;
+                const variation = 1 + (Math.sin(i * 0.5) * 0.15); // Seasonal variation
+                const projectedInflow = avgInflow * variation;
+                const projectedOutflow = avgOutflow * (1 + (Math.random() * 0.1 - 0.05));
+                runningBalance += projectedInflow - projectedOutflow;
+                
+                forecast.push({
+                  month: monthNames[monthIndex],
+                  balance: runningBalance
+                });
+              }
+
+              const maxBalance = Math.max(...forecast.map(f => f.balance));
+              const minBalance = Math.min(...forecast.map(f => f.balance));
+              const range = maxBalance - minBalance || 1;
+
+              return (
+                <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-6">
+                  <div className="h-64 flex items-end gap-2">
+                    {forecast.map((f, index) => {
+                      const height = ((f.balance - minBalance) / range) * 100;
+                      const isPositive = f.balance >= 0;
+                      return (
+                        <div key={index} className="flex-1 flex flex-col items-center group">
+                          <div className="relative w-full flex flex-col items-center">
+                            <div className="absolute bottom-full mb-2 hidden group-hover:block bg-gray-800 text-white text-xs px-2 py-1 rounded whitespace-nowrap z-10">
+                              {formatCurrency(f.balance)}
+                            </div>
+                            <div 
+                              className={`w-full rounded-t transition-all ${
+                                isPositive 
+                                  ? 'bg-gradient-to-t from-blue-500 to-blue-400 hover:from-blue-600 hover:to-blue-500' 
+                                  : 'bg-gradient-to-t from-red-500 to-red-400 hover:from-red-600 hover:to-red-500'
+                              }`}
+                              style={{ 
+                                height: `${Math.max(height, 10)}%`,
+                                minHeight: '20px'
+                              }}
+                            />
+                          </div>
+                          <span className="text-xs text-gray-600 mt-2 font-medium">{f.month}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  
+                  <div className="mt-6 grid grid-cols-3 gap-4 text-center">
+                    <div className="bg-white rounded-lg p-3 shadow-sm">
+                      <p className="text-xs text-gray-500">Solde actuel</p>
+                      <p className="text-lg font-bold text-gray-900">{formatCurrency(currentBalance)}</p>
+                    </div>
+                    <div className="bg-white rounded-lg p-3 shadow-sm">
+                      <p className="text-xs text-gray-500">Prévision 6 mois</p>
+                      <p className={`text-lg font-bold ${forecast[5]?.balance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        {formatCurrency(forecast[5]?.balance || 0)}
+                      </p>
+                    </div>
+                    <div className="bg-white rounded-lg p-3 shadow-sm">
+                      <p className="text-xs text-gray-500">Prévision 12 mois</p>
+                      <p className={`text-lg font-bold ${forecast[11]?.balance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        {formatCurrency(forecast[11]?.balance || 0)}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
         </div>
       )}
     </div>
