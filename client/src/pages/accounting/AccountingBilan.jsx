@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { 
   ArrowLeft, Download, Calendar, FileText, 
-  TrendingUp, TrendingDown, BarChart3
+  TrendingUp, TrendingDown, BarChart3, Sparkles, Globe, FileSpreadsheet, Code
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../../utils/api';
@@ -175,6 +175,67 @@ const AccountingBilan = () => {
     toast.success('PDF généré avec succès !');
   };
 
+  const handleExportExcel = () => {
+    // Create CSV content (compatible with Excel)
+    const csvContent = `
+BILAN COMPTABLE - FORMAT TUNISIEN
+Date: ${new Date(asOfDate).toLocaleDateString('fr-FR')}
+
+ACTIF
+Trésorerie disponible;${balanceSheet?.assets?.currentAssets || 0}
+${balanceSheet?.assets?.details?.map(d => `${d.category};${d.total}`).join('\n') || ''}
+TOTAL ACTIF;${balanceSheet?.totalAssets || 0}
+
+PASSIF
+Dettes courantes;${balanceSheet?.liabilities?.currentLiabilities || 0}
+Résultat cumulé;${balanceSheet?.equity?.retainedEarnings || 0}
+TOTAL PASSIF;${balanceSheet?.totalAssets || 0}
+
+Généré par StartUpLab - Conforme NCT
+`;
+    
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `bilan_tunisien_${asOfDate}.csv`;
+    link.click();
+    toast.success('Export Excel (CSV) téléchargé !');
+  };
+
+  const handleExportXML = () => {
+    // Create XML content for DGCF declaration
+    const xmlContent = `<?xml version="1.0" encoding="UTF-8"?>
+<DeclarationFiscale xmlns="http://www.finances.gov.tn/dgcf">
+  <Entete>
+    <TypeDeclaration>BILAN_ANNUEL</TypeDeclaration>
+    <DateGeneration>${new Date().toISOString()}</DateGeneration>
+    <PeriodeReference>${asOfDate}</PeriodeReference>
+  </Entete>
+  <Bilan>
+    <Actif>
+      <TresorerieDisponible>${balanceSheet?.assets?.currentAssets || 0}</TresorerieDisponible>
+      <TotalActif>${balanceSheet?.totalAssets || 0}</TotalActif>
+    </Actif>
+    <Passif>
+      <DettesCourantes>${balanceSheet?.liabilities?.currentLiabilities || 0}</DettesCourantes>
+      <CapitauxPropres>${balanceSheet?.equity?.retainedEarnings || 0}</CapitauxPropres>
+      <TotalPassif>${balanceSheet?.totalAssets || 0}</TotalPassif>
+    </Passif>
+  </Bilan>
+  <Signature>
+    <Application>StartUpLab</Application>
+    <ConformiteNCT>true</ConformiteNCT>
+  </Signature>
+</DeclarationFiscale>`;
+    
+    const blob = new Blob([xmlContent], { type: 'application/xml;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `declaration_dgcf_${asOfDate}.xml`;
+    link.click();
+    toast.success('Export XML DGCF téléchargé !');
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -249,6 +310,7 @@ const AccountingBilan = () => {
 
       {/* Balance Sheet */}
       {activeTab === 'balance' && balanceSheet && (
+        <>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Actif */}
           <div className="card">
@@ -348,6 +410,118 @@ const AccountingBilan = () => {
             </div>
           </div>
         </div>
+
+        {/* Analyse Automatique - Recommandation IA */}
+        <div className="card bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 bg-indigo-500 rounded-lg flex items-center justify-center">
+              <Sparkles className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold text-indigo-900">Analyse Automatique</h3>
+              <p className="text-sm text-indigo-600">Recommandation IA basée sur vos données</p>
+            </div>
+          </div>
+          <div className="grid grid-cols-3 gap-4 mb-4">
+            <div className="bg-white p-4 rounded-lg text-center shadow-sm">
+              <p className="text-2xl font-bold text-green-600">
+                {balanceSheet?.totalAssets > 0 ? Math.round((balanceSheet?.equity?.retainedEarnings / balanceSheet?.totalAssets) * 100) : 0}%
+              </p>
+              <p className="text-sm text-gray-600">Marge nette</p>
+            </div>
+            <div className="bg-white p-4 rounded-lg text-center shadow-sm">
+              <p className="text-2xl font-bold text-blue-600">
+                {balanceSheet?.liabilities?.currentLiabilities > 0 
+                  ? (balanceSheet?.assets?.currentAssets / balanceSheet?.liabilities?.currentLiabilities).toFixed(1) 
+                  : '∞'}
+              </p>
+              <p className="text-sm text-gray-600">Ratio liquidité</p>
+            </div>
+            <div className="bg-white p-4 rounded-lg text-center shadow-sm">
+              <p className="text-2xl font-bold text-purple-600">
+                {balanceSheet?.equity?.retainedEarnings >= 0 ? '+' : ''}{Math.round(((balanceSheet?.equity?.retainedEarnings || 0) / Math.max(1, Math.abs(balanceSheet?.totalAssets || 1))) * 100)}%
+              </p>
+              <p className="text-sm text-gray-600">Performance</p>
+            </div>
+          </div>
+          <div className="bg-white p-4 rounded-lg border border-indigo-100">
+            <div className="flex items-start gap-3">
+              <div className="w-8 h-8 bg-indigo-500 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
+                IA
+              </div>
+              <div>
+                <p className="font-medium text-indigo-800">Recommandation</p>
+                <p className="text-sm text-gray-600 mt-1">
+                  {balanceSheet?.equity?.retainedEarnings >= 0 
+                    ? `Votre situation financière est saine avec un résultat positif de ${formatCurrency(balanceSheet?.equity?.retainedEarnings)}. Considérez d'investir dans l'expansion de votre activité.`
+                    : `Attention : Votre résultat est négatif (${formatCurrency(balanceSheet?.equity?.retainedEarnings)}). Réduisez les charges ou augmentez les revenus.`
+                  }
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Format Standard Tunisien */}
+        <div className="card border border-orange-200">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 bg-orange-500 rounded-lg flex items-center justify-center">
+              <Globe className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold text-orange-900">Format Standard Tunisien</h3>
+              <p className="text-sm text-orange-600">Conforme aux normes comptables tunisiennes (NCT)</p>
+            </div>
+          </div>
+          <div className="bg-orange-50 p-4 rounded-lg">
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <p className="font-medium text-orange-800 mb-2">Conformité</p>
+                <ul className="space-y-1 text-gray-600">
+                  <li className="flex items-center gap-2">
+                    <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                    Plan Comptable Tunisien
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                    Normes NCT 01 à 15
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                    Format déclaration fiscale
+                  </li>
+                </ul>
+              </div>
+              <div>
+                <p className="font-medium text-orange-800 mb-2">Export disponible</p>
+                <div className="space-y-2">
+                  <button
+                    onClick={handleExportPDF}
+                    className="w-full flex items-center gap-2 p-2 bg-white rounded-lg hover:bg-red-50 transition-colors text-left"
+                  >
+                    <FileText className="w-4 h-4 text-red-500" />
+                    <span className="text-gray-700">PDF conforme CNI</span>
+                  </button>
+                  <button
+                    onClick={handleExportExcel}
+                    className="w-full flex items-center gap-2 p-2 bg-white rounded-lg hover:bg-green-50 transition-colors text-left"
+                  >
+                    <FileSpreadsheet className="w-4 h-4 text-green-500" />
+                    <span className="text-gray-700">Excel format tunisien</span>
+                  </button>
+                  <button
+                    onClick={handleExportXML}
+                    className="w-full flex items-center gap-2 p-2 bg-white rounded-lg hover:bg-blue-50 transition-colors text-left"
+                  >
+                    <Code className="w-4 h-4 text-blue-500" />
+                    <span className="text-gray-700">XML déclaration DGCF</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        </>
       )}
 
       {/* Income Statement */}

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { 
   ArrowLeft, Calculator, Download, Calendar, 
-  FileText, CheckCircle, Clock, AlertTriangle
+  FileText, CheckCircle, Clock, AlertTriangle, Trash2
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../../utils/api';
@@ -13,6 +13,10 @@ const AccountingTVA = () => {
   const [loading, setLoading] = useState(true);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
+  const [vatRate, setVatRate] = useState(19);
+  const [customRate, setCustomRate] = useState(false);
+  const [salesHT, setSalesHT] = useState(0);
+  const [purchasesHT, setPurchasesHT] = useState(0);
 
   const months = [
     { value: 1, label: 'Janvier' },
@@ -54,13 +58,25 @@ const AccountingTVA = () => {
       await api.post('/accounting/vat/declarations', {
         year: selectedYear,
         month: selectedMonth,
-        salesAmount: vatSummary.salesTTC,
-        purchasesAmount: vatSummary.purchasesTTC,
-        vatCollected: vatSummary.vatCollected,
-        vatDeductible: vatSummary.vatDeductible,
-        vatDue: vatSummary.vatDue
+        salesAmount: displaySalesTTC,
+        purchasesAmount: displayPurchasesTTC,
+        vatCollected: calculatedVatCollected,
+        vatDeductible: calculatedVatDeductible,
+        vatDue: calculatedVatDue,
+        vatRate: vatRate
       });
       toast.success('Déclaration TVA enregistrée !');
+      fetchData();
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Erreur');
+    }
+  };
+
+  const handleDeleteDeclaration = async (id) => {
+    if (!confirm('Supprimer cette déclaration ?')) return;
+    try {
+      await api.delete(`/accounting/vat/declarations/${id}`);
+      toast.success('Déclaration supprimée !');
       fetchData();
     } catch (error) {
       toast.error(error.response?.data?.message || 'Erreur');
@@ -73,6 +89,17 @@ const AccountingTVA = () => {
       minimumFractionDigits: 2
     }).format(amount || 0) + ' TND';
   };
+
+  // Calculate TVA based on custom rate
+  const calculatedVatCollected = (salesHT || vatSummary?.salesHT || 0) * (vatRate / 100);
+  const calculatedVatDeductible = (purchasesHT || vatSummary?.purchasesHT || 0) * (vatRate / 100);
+  const calculatedVatDue = calculatedVatCollected - calculatedVatDeductible;
+
+  // Use calculated values or API values
+  const displaySalesHT = salesHT || vatSummary?.salesHT || 0;
+  const displayPurchasesHT = purchasesHT || vatSummary?.purchasesHT || 0;
+  const displaySalesTTC = displaySalesHT * (1 + vatRate / 100);
+  const displayPurchasesTTC = displayPurchasesHT * (1 + vatRate / 100);
 
   if (loading) {
     return (
@@ -138,15 +165,15 @@ const AccountingTVA = () => {
             <div className="space-y-3">
               <div className="flex justify-between items-center">
                 <span className="text-gray-600">Chiffre d'affaires HT</span>
-                <span className="font-medium">{formatCurrency(vatSummary?.salesHT)}</span>
+                <span className="font-medium">{formatCurrency(displaySalesHT)}</span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-gray-600">Chiffre d'affaires TTC</span>
-                <span className="font-medium">{formatCurrency(vatSummary?.salesTTC)}</span>
+                <span className="font-medium">{formatCurrency(displaySalesTTC)}</span>
               </div>
               <div className="flex justify-between items-center pt-3 border-t">
-                <span className="font-medium text-orange-700">TVA Collectée ({vatSummary?.vatRate})</span>
-                <span className="font-bold text-orange-600">{formatCurrency(vatSummary?.vatCollected)}</span>
+                <span className="font-medium text-orange-700">TVA Collectée ({vatRate}%)</span>
+                <span className="font-bold text-orange-600">{formatCurrency(calculatedVatCollected)}</span>
               </div>
             </div>
           </div>
@@ -157,15 +184,15 @@ const AccountingTVA = () => {
             <div className="space-y-3">
               <div className="flex justify-between items-center">
                 <span className="text-gray-600">Total achats HT</span>
-                <span className="font-medium">{formatCurrency(vatSummary?.purchasesHT)}</span>
+                <span className="font-medium">{formatCurrency(displayPurchasesHT)}</span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-gray-600">Total achats TTC</span>
-                <span className="font-medium">{formatCurrency(vatSummary?.purchasesTTC)}</span>
+                <span className="font-medium">{formatCurrency(displayPurchasesTTC)}</span>
               </div>
               <div className="flex justify-between items-center pt-3 border-t">
-                <span className="font-medium text-green-700">TVA Déductible ({vatSummary?.vatRate})</span>
-                <span className="font-bold text-green-600">{formatCurrency(vatSummary?.vatDeductible)}</span>
+                <span className="font-medium text-green-700">TVA Déductible ({vatRate}%)</span>
+                <span className="font-bold text-green-600">{formatCurrency(calculatedVatDeductible)}</span>
               </div>
             </div>
           </div>
@@ -173,17 +200,17 @@ const AccountingTVA = () => {
 
         {/* TVA Due */}
         <div className={`mt-6 p-5 rounded-xl ${
-          (vatSummary?.vatDue || 0) >= 0 ? 'bg-red-50 border border-red-200' : 'bg-green-50 border border-green-200'
+          calculatedVatDue >= 0 ? 'bg-red-50 border border-red-200' : 'bg-green-50 border border-green-200'
         }`}>
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-600 mb-1">
-                {(vatSummary?.vatDue || 0) >= 0 ? 'TVA à payer' : 'Crédit de TVA'}
+                {calculatedVatDue >= 0 ? 'TVA à payer' : 'Crédit de TVA'}
               </p>
               <p className={`text-3xl font-bold ${
-                (vatSummary?.vatDue || 0) >= 0 ? 'text-red-600' : 'text-green-600'
+                calculatedVatDue >= 0 ? 'text-red-600' : 'text-green-600'
               }`}>
-                {formatCurrency(Math.abs(vatSummary?.vatDue || 0))}
+                {formatCurrency(Math.abs(calculatedVatDue))}
               </p>
             </div>
             <button
@@ -197,39 +224,117 @@ const AccountingTVA = () => {
         </div>
       </div>
 
-      {/* Info Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="card">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-              <Calculator className="w-5 h-5 text-blue-600" />
+      {/* TVA Rate Selector */}
+      <div className="card border-2 border-primary-200 bg-gradient-to-r from-primary-50 to-indigo-50">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Configuration du taux TVA</h3>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <button
+            onClick={() => { setVatRate(19); setCustomRate(false); }}
+            className={`p-4 rounded-xl border-2 transition-all ${
+              vatRate === 19 && !customRate
+                ? 'border-primary-500 bg-primary-100'
+                : 'border-gray-200 bg-white hover:border-primary-300'
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                <Calculator className="w-5 h-5 text-blue-600" />
+              </div>
+              <div className="text-left">
+                <p className="text-sm text-gray-500">Standard</p>
+                <p className="text-xl font-bold text-gray-900">19%</p>
+              </div>
             </div>
-            <div>
-              <p className="text-sm text-gray-500">Taux TVA Standard</p>
-              <p className="text-xl font-bold text-gray-900">19%</p>
+          </button>
+          <button
+            onClick={() => { setVatRate(7); setCustomRate(false); }}
+            className={`p-4 rounded-xl border-2 transition-all ${
+              vatRate === 7 && !customRate
+                ? 'border-primary-500 bg-primary-100'
+                : 'border-gray-200 bg-white hover:border-primary-300'
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+                <Calculator className="w-5 h-5 text-green-600" />
+              </div>
+              <div className="text-left">
+                <p className="text-sm text-gray-500">Réduit</p>
+                <p className="text-xl font-bold text-gray-900">7%</p>
+              </div>
+            </div>
+          </button>
+          <div className={`p-4 rounded-xl border-2 transition-all ${
+            customRate ? 'border-primary-500 bg-primary-100' : 'border-gray-200 bg-white'
+          }`}>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
+                <Calculator className="w-5 h-5 text-purple-600" />
+              </div>
+              <div className="text-left flex-1">
+                <p className="text-sm text-gray-500">Personnalisé</p>
+                <div className="flex items-center gap-1">
+                  <input
+                    type="number"
+                    value={customRate ? vatRate : ''}
+                    onChange={(e) => { 
+                      setCustomRate(true);
+                      setVatRate(parseFloat(e.target.value) || 0);
+                    }}
+                    placeholder="Taux"
+                    className="w-16 px-2 py-1 border rounded text-lg font-bold"
+                    min="0"
+                    max="100"
+                    step="0.5"
+                  />
+                  <span className="text-xl font-bold">%</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="p-4 rounded-xl border-2 border-gray-200 bg-white">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
+                <Calendar className="w-5 h-5 text-orange-600" />
+              </div>
+              <div className="text-left">
+                <p className="text-sm text-gray-500">Échéance</p>
+                <p className="text-xl font-bold text-gray-900">28 du mois</p>
+              </div>
             </div>
           </div>
         </div>
-        <div className="card">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-              <Calculator className="w-5 h-5 text-green-600" />
-            </div>
-            <div>
-              <p className="text-sm text-gray-500">Taux TVA Réduit</p>
-              <p className="text-xl font-bold text-gray-900">7%</p>
-            </div>
+      </div>
+
+      {/* Manual Entry Section */}
+      <div className="card">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Saisie manuelle (optionnel)</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Ventes HT (TND)</label>
+            <input
+              type="number"
+              value={salesHT || ''}
+              onChange={(e) => setSalesHT(parseFloat(e.target.value) || 0)}
+              placeholder={vatSummary?.salesHT?.toString() || '0'}
+              className="input w-full"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              TVA calculée: {formatCurrency(salesHT * vatRate / 100)} ({vatRate}%)
+            </p>
           </div>
-        </div>
-        <div className="card">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
-              <Calendar className="w-5 h-5 text-orange-600" />
-            </div>
-            <div>
-              <p className="text-sm text-gray-500">Échéance</p>
-              <p className="text-xl font-bold text-gray-900">28 du mois</p>
-            </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Achats HT (TND)</label>
+            <input
+              type="number"
+              value={purchasesHT || ''}
+              onChange={(e) => setPurchasesHT(parseFloat(e.target.value) || 0)}
+              placeholder={vatSummary?.purchasesHT?.toString() || '0'}
+              className="input w-full"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              TVA déductible: {formatCurrency(purchasesHT * vatRate / 100)} ({vatRate}%)
+            </p>
           </div>
         </div>
       </div>
@@ -248,6 +353,7 @@ const AccountingTVA = () => {
                 <th className="text-right px-4 py-3 text-sm font-medium text-gray-600">TVA Déductible</th>
                 <th className="text-right px-4 py-3 text-sm font-medium text-gray-600">TVA Due</th>
                 <th className="text-center px-4 py-3 text-sm font-medium text-gray-600">Statut</th>
+                <th className="text-center px-4 py-3 text-sm font-medium text-gray-600">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y">
@@ -272,6 +378,15 @@ const AccountingTVA = () => {
                         Brouillon
                       </span>
                     )}
+                  </td>
+                  <td className="px-4 py-3 text-center">
+                    <button
+                      onClick={() => handleDeleteDeclaration(decl.id)}
+                      className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                      title="Supprimer"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
                   </td>
                 </tr>
               ))}

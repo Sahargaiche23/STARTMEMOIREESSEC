@@ -457,6 +457,24 @@ router.get('/vat/declarations', authMiddleware, (req, res) => {
   }
 });
 
+// Delete VAT declaration
+router.delete('/vat/declarations/:id', authMiddleware, (req, res) => {
+  try {
+    const declaration = db.prepare('SELECT * FROM vat_declarations WHERE id = ? AND userId = ?')
+      .get(req.params.id, req.user.userId);
+    
+    if (!declaration) {
+      return res.status(404).json({ message: 'Déclaration non trouvée' });
+    }
+
+    db.prepare('DELETE FROM vat_declarations WHERE id = ?').run(req.params.id);
+    res.json({ message: 'Déclaration supprimée' });
+  } catch (error) {
+    console.error('Delete VAT declaration error:', error);
+    res.status(500).json({ message: 'Erreur serveur' });
+  }
+});
+
 // ============ EXPORT ============
 
 // Export data for accountant
@@ -567,6 +585,180 @@ router.get('/export/summary', authMiddleware, (req, res) => {
     });
   } catch (error) {
     console.error('Export summary error:', error);
+    res.status(500).json({ message: 'Erreur serveur' });
+  }
+});
+
+// ============ SHARE WITH ACCOUNTANT ============
+
+// Send invite to accountant via email
+router.post('/share/invite', authMiddleware, async (req, res) => {
+  try {
+    const { email, name, startDate, endDate } = req.body;
+    
+    if (!email) {
+      return res.status(400).json({ message: 'Email requis' });
+    }
+
+    const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.userId);
+    
+    // Generate secure access token
+    const crypto = require('crypto');
+    const accessToken = crypto.randomBytes(32).toString('hex');
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+    
+    // Save share invitation
+    db.prepare(`
+      INSERT INTO accountant_shares (userId, accountantEmail, accountantName, accessToken, startDate, endDate, expiresAt, createdAt)
+      VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
+    `).run(req.user.userId, email, name || '', accessToken, startDate, endDate, expiresAt.toISOString());
+
+    // Send email using nodemailer
+    const nodemailer = require('nodemailer');
+    
+    const transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS
+      }
+    });
+
+    const accessLink = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/comptabilite/shared/${accessToken}`;
+    
+    const mailOptions = {
+      from: `"StartUpLab" <${process.env.EMAIL_USER}>`,
+      to: email,
+      subject: `${user.firstName} ${user.lastName} vous partage ses données comptables`,
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <style>
+            body { font-family: Arial, sans-serif; background: #f5f5f5; padding: 20px; }
+            .container { max-width: 600px; margin: 0 auto; background: white; border-radius: 12px; padding: 30px; }
+            .header { text-align: center; margin-bottom: 30px; }
+            .logo { font-size: 24px; font-weight: bold; color: #4f46e5; }
+            h1 { color: #1a1a1a; margin-bottom: 10px; }
+            .info { background: #f8fafc; border-radius: 8px; padding: 20px; margin: 20px 0; }
+            .btn { display: inline-block; background: #4f46e5; color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: 600; }
+            .footer { text-align: center; color: #666; font-size: 12px; margin-top: 30px; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <div class="logo">🚀 StartUpLab</div>
+            </div>
+            <h1>Invitation à consulter les données comptables</h1>
+            <p>Bonjour${name ? ` ${name}` : ''},</p>
+            <p><strong>${user.firstName} ${user.lastName}</strong> vous invite à consulter ses données comptables sur StartUpLab.</p>
+            
+            <div class="info">
+              <p><strong>Période :</strong> Du ${new Date(startDate).toLocaleDateString('fr-FR')} au ${new Date(endDate).toLocaleDateString('fr-FR')}</p>
+              <p><strong>Accès disponible :</strong> 7 jours</p>
+              <p><strong>Données accessibles :</strong></p>
+              <ul>
+                <li>Fichier FEC (écritures comptables)</li>
+                <li>Rapport de synthèse</li>
+                <li>Export des transactions</li>
+              </ul>
+            </div>
+            
+            <p style="text-align: center;">
+              <a href="${accessLink}" class="btn">Accéder aux données</a>
+            </p>
+            
+            <div class="footer">
+              <p>Ce lien expire le ${expiresAt.toLocaleDateString('fr-FR')}</p>
+              <p>StartUpLab - Plateforme de gestion pour entrepreneurs tunisiens</p>
+            </div>
+          </div>
+        </body>
+        </html>
+      `
+    };
+
+    await transporter.sendMail(mailOptions);
+    
+    // Create notification for user
+    db.prepare(`
+      INSERT INTO notifications (userId, type, title, message, createdAt)
+      VALUES (?, 'share', 'Invitation envoyée', ?, datetime('now'))
+    `).run(req.user.userId, `Données comptables partagées avec ${email}`);
+
+    res.json({ message: 'Invitation envoyée avec succès' });
+  } catch (error) {
+    console.error('Share invite error:', error);
+    res.status(500).json({ message: 'Erreur lors de l\'envoi. Vérifiez la configuration email.' });
+  }
+});
+
+// Get shared data by access token (public route for accountants)
+router.get('/shared/:token', (req, res) => {
+  try {
+    const share = db.prepare(`
+      SELECT s.*, u.firstName, u.lastName, u.email as userEmail, u.company
+      FROM accountant_shares s
+      JOIN users u ON s.userId = u.id
+      WHERE s.accessToken = ?
+    `).get(req.params.token);
+    
+    // Check expiry manually
+    if (share && new Date(share.expiresAt) < new Date()) {
+      return res.status(404).json({ message: 'Lien expiré' });
+    }
+
+    if (!share) {
+      return res.status(404).json({ message: 'Lien invalide ou expiré' });
+    }
+
+    // Mark as viewed
+    db.prepare("UPDATE accountant_shares SET viewedAt = datetime('now') WHERE id = ?").run(share.id);
+
+    // Get transactions for the period
+    const transactions = db.prepare(`
+      SELECT * FROM accounting_transactions 
+      WHERE userId = ? AND date BETWEEN ? AND ?
+      ORDER BY date DESC
+    `).all(share.userId, share.startDate, share.endDate);
+
+    // Calculate summary
+    const revenues = transactions.filter(t => t.type === 'revenue');
+    const expenses = transactions.filter(t => t.type === 'expense');
+    const totalRevenue = revenues.reduce((sum, t) => sum + t.amount, 0);
+    const totalExpense = expenses.reduce((sum, t) => sum + t.amount, 0);
+
+    // Get VAT declarations
+    const vatDeclarations = db.prepare(`
+      SELECT * FROM vat_declarations 
+      WHERE userId = ? 
+      ORDER BY year DESC, month DESC
+      LIMIT 12
+    `).all(share.userId);
+
+    res.json({
+      owner: {
+        name: `${share.firstName} ${share.lastName}`,
+        company: share.company || '',
+        email: share.userEmail
+      },
+      period: {
+        start: share.startDate,
+        end: share.endDate
+      },
+      expiresAt: share.expiresAt,
+      transactions,
+      summary: {
+        totalRevenue,
+        totalExpense,
+        netProfit: totalRevenue - totalExpense,
+        transactionCount: transactions.length
+      },
+      vatDeclarations
+    });
+  } catch (error) {
+    console.error('Get shared data error:', error);
     res.status(500).json({ message: 'Erreur serveur' });
   }
 });

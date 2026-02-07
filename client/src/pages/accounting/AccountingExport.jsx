@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { 
   ArrowLeft, Download, FileText, FileSpreadsheet, 
-  Share2, Mail, Calendar, CheckCircle
+  Share2, Mail, Calendar, CheckCircle, X, Send, User
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../../utils/api';
@@ -12,6 +12,10 @@ const AccountingExport = () => {
   const [startDate, setStartDate] = useState(new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0]);
   const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
   const [exportData, setExportData] = useState(null);
+  const [showInviteModal, setShowInviteModal] = useState(false);
+  const [accountantEmail, setAccountantEmail] = useState('');
+  const [accountantName, setAccountantName] = useState('');
+  const [sendingInvite, setSendingInvite] = useState(false);
 
   const handleExportFEC = async () => {
     setLoading(true);
@@ -140,6 +144,31 @@ const AccountingExport = () => {
       toast.error('Erreur lors de l\'export');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSendInvite = async () => {
+    if (!accountantEmail) {
+      toast.error('Veuillez entrer l\'email du comptable');
+      return;
+    }
+    
+    setSendingInvite(true);
+    try {
+      await api.post('/accounting/share/invite', {
+        email: accountantEmail,
+        name: accountantName,
+        startDate,
+        endDate
+      });
+      toast.success(`Invitation envoyée à ${accountantEmail} !`);
+      setShowInviteModal(false);
+      setAccountantEmail('');
+      setAccountantName('');
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Erreur lors de l\'envoi');
+    } finally {
+      setSendingInvite(false);
     }
   };
 
@@ -308,12 +337,110 @@ const AccountingExport = () => {
             <h3 className="text-lg font-semibold text-gray-900">Partager avec votre expert-comptable</h3>
             <p className="text-gray-600">Envoyez un accès sécurisé à votre comptable pour qu'il puisse consulter vos données</p>
           </div>
-          <button className="btn-primary flex items-center gap-2">
+          <button 
+            onClick={() => setShowInviteModal(true)}
+            className="btn-primary flex items-center gap-2"
+          >
             <Mail className="w-5 h-5" />
             Inviter
           </button>
         </div>
       </div>
+
+      {/* Invite Modal */}
+      {showInviteModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-md mx-4 shadow-2xl">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
+                  <Mail className="w-6 h-6 text-blue-600" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">Inviter un expert-comptable</h3>
+                  <p className="text-sm text-gray-500">Envoi par email sécurisé</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setShowInviteModal(false)}
+                className="p-2 hover:bg-gray-100 rounded-lg"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Nom du comptable (optionnel)
+                </label>
+                <div className="relative">
+                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <input
+                    type="text"
+                    value={accountantName}
+                    onChange={(e) => setAccountantName(e.target.value)}
+                    placeholder="M. Dupont"
+                    className="input pl-10 w-full"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Email du comptable *
+                </label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <input
+                    type="email"
+                    value={accountantEmail}
+                    onChange={(e) => setAccountantEmail(e.target.value)}
+                    placeholder="comptable@cabinet.com"
+                    className="input pl-10 w-full"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="bg-gray-50 rounded-xl p-4">
+                <p className="text-sm text-gray-600 mb-2">
+                  <strong>Données partagées :</strong>
+                </p>
+                <ul className="text-sm text-gray-500 space-y-1">
+                  <li>• Période : {new Date(startDate).toLocaleDateString('fr-FR')} - {new Date(endDate).toLocaleDateString('fr-FR')}</li>
+                  <li>• Fichier FEC (écritures comptables)</li>
+                  <li>• Rapport de synthèse (revenus/dépenses)</li>
+                  <li>• Export des transactions</li>
+                </ul>
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={() => setShowInviteModal(false)}
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                >
+                  Annuler
+                </button>
+                <button
+                  onClick={handleSendInvite}
+                  disabled={sendingInvite || !accountantEmail}
+                  className="flex-1 btn-primary flex items-center justify-center gap-2"
+                >
+                  {sendingInvite ? (
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <>
+                      <Send className="w-5 h-5" />
+                      Envoyer
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

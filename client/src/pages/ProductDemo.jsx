@@ -3,7 +3,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { 
   ArrowLeft, Check, Play, Star, Lock, Calculator, 
   TrendingUp, TrendingDown, PieChart, FileText, 
-  Receipt, BarChart3, Download, Users, Briefcase
+  Receipt, BarChart3, Download, Users, Briefcase, Clock
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../utils/api';
@@ -16,10 +16,34 @@ const ProductDemo = () => {
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activating, setActivating] = useState(false);
+  const [userProduct, setUserProduct] = useState(null);
+
+  // Mapping des produits vers leurs pages réelles
+  const productRedirects = {
+    'bilan-auto': '/comptabilite/bilan',
+    'comptabilite-lite': '/comptabilite',
+    'comptabilite-pro': '/comptabilite',
+    'tva-tunisie': '/comptabilite/tva',
+    'export-expert': '/comptabilite/export',
+    'pack-comptabilite-complet': '/comptabilite'
+  };
 
   useEffect(() => {
     fetchProduct();
+    checkUserProduct();
   }, [slug]);
+
+  const checkUserProduct = async () => {
+    try {
+      const res = await api.get('/products/my-products');
+      const found = res.data.products?.find(p => p.slug === slug);
+      if (found) {
+        setUserProduct(found);
+      }
+    } catch (error) {
+      // Ignore if not logged in
+    }
+  };
 
   const fetchProduct = async () => {
     try {
@@ -167,22 +191,146 @@ const ProductDemo = () => {
         description: 'Génération automatique de bilans comptables',
         screens: [
           {
-            title: 'Format standard tunisien',
-            description: 'Bilan conforme aux normes tunisiennes',
+            title: 'Bilan Actif / Passif',
+            description: 'Vue complète de votre situation financière',
+            component: (
+              <div className="bg-white rounded-xl shadow-lg overflow-hidden">
+                <div className="bg-gradient-to-r from-primary-600 to-indigo-600 p-4 text-white flex justify-between items-center">
+                  <div>
+                    <h3 className="text-lg font-bold">États Financiers</h3>
+                    <p className="text-sm text-white/80">Bilan, compte de résultat et cash flow</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm">07/02/2026</span>
+                    <button className="px-3 py-1 bg-red-500 text-white rounded-lg text-sm flex items-center gap-1">
+                      <FileText className="w-4 h-4" />
+                      Exporter PDF
+                    </button>
+                  </div>
+                </div>
+                <div className="p-4">
+                  <div className="flex gap-4 mb-4 border-b">
+                    <button className="px-4 py-2 border-b-2 border-primary-600 text-primary-600 font-medium">Bilan</button>
+                    <button className="px-4 py-2 text-gray-500">Compte de Résultat</button>
+                    <button className="px-4 py-2 text-gray-500">Cash Flow</button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-6">
+                    <div className="bg-green-50 rounded-xl p-4">
+                      <div className="flex items-center gap-2 mb-4">
+                        <TrendingUp className="w-5 h-5 text-green-600" />
+                        <h4 className="font-bold text-green-800">ACTIF</h4>
+                        <span className="text-xs text-gray-500 ml-auto">Au 07/02/2026</span>
+                      </div>
+                      <div className="space-y-3 text-sm">
+                        <div className="text-green-700 font-medium">Actif Circulant</div>
+                        <div className="flex justify-between pl-4">
+                          <span>Trésorerie disponible</span>
+                          <span className="font-bold text-green-600">600,00 TND</span>
+                        </div>
+                        <div className="text-green-700 font-medium mt-2">Détail par catégorie</div>
+                        <div className="flex justify-between pl-4">
+                          <span>Ventes produits</span>
+                          <span>1200,00 TND</span>
+                        </div>
+                        <div className="flex justify-between pt-2 border-t font-bold">
+                          <span>TOTAL ACTIF</span>
+                          <span className="text-green-600">600,00 TND</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="bg-blue-50 rounded-xl p-4">
+                      <div className="flex items-center gap-2 mb-4">
+                        <PieChart className="w-5 h-5 text-blue-600" />
+                        <h4 className="font-bold text-blue-800">PASSIF</h4>
+                        <span className="text-xs text-gray-500 ml-auto">Au 07/02/2026</span>
+                      </div>
+                      <div className="space-y-3 text-sm">
+                        <div className="text-blue-700 font-medium">Dettes</div>
+                        <div className="flex justify-between pl-4">
+                          <span>Dettes courantes</span>
+                          <span>0,00 TND</span>
+                        </div>
+                        <div className="text-blue-700 font-medium mt-2">Capitaux Propres</div>
+                        <div className="flex justify-between pl-4">
+                          <span>Résultat cumulé</span>
+                          <span className="font-bold text-blue-600">600,00 TND</span>
+                        </div>
+                        <div className="flex justify-between pt-2 border-t font-bold">
+                          <span>TOTAL PASSIF</span>
+                          <span className="text-blue-600">600,00 TND</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )
+          },
+          {
+            title: 'Compte de Résultat',
+            description: 'Analyse des revenus et charges',
             component: (
               <div className="bg-white rounded-xl p-6 shadow-lg">
-                <div className="text-center border-b pb-4 mb-4">
-                  <h3 className="text-lg font-bold">BILAN COMPTABLE</h3>
-                  <p className="text-sm text-gray-500">Exercice 2026</p>
-                </div>
-                <div className="grid grid-cols-2 gap-4 text-sm">
+                <h4 className="font-bold text-lg mb-4">Compte de Résultat - Exercice 2026</h4>
+                <div className="space-y-4">
                   <div className="bg-green-50 p-4 rounded-lg">
-                    <p className="font-semibold text-green-700 mb-2">Actif Immobilisé</p>
-                    <p>Immobilisations: 25,000 TND</p>
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="font-medium text-green-700">Produits d'exploitation</span>
+                      <span className="font-bold text-green-600">15,500 TND</span>
+                    </div>
+                    <div className="text-sm text-gray-600 pl-4 space-y-1">
+                      <div className="flex justify-between"><span>Ventes de marchandises</span><span>12,000 TND</span></div>
+                      <div className="flex justify-between"><span>Prestations de services</span><span>3,500 TND</span></div>
+                    </div>
                   </div>
-                  <div className="bg-blue-50 p-4 rounded-lg">
-                    <p className="font-semibold text-blue-700 mb-2">Capitaux Propres</p>
-                    <p>Capital: 50,000 TND</p>
+                  <div className="bg-red-50 p-4 rounded-lg">
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="font-medium text-red-700">Charges d'exploitation</span>
+                      <span className="font-bold text-red-600">-8,200 TND</span>
+                    </div>
+                    <div className="text-sm text-gray-600 pl-4 space-y-1">
+                      <div className="flex justify-between"><span>Achats de matières</span><span>-4,500 TND</span></div>
+                      <div className="flex justify-between"><span>Charges de personnel</span><span>-2,500 TND</span></div>
+                      <div className="flex justify-between"><span>Autres charges</span><span>-1,200 TND</span></div>
+                    </div>
+                  </div>
+                  <div className="bg-primary-50 p-4 rounded-lg border-2 border-primary-200">
+                    <div className="flex justify-between items-center">
+                      <span className="font-bold text-primary-700">Résultat Net</span>
+                      <span className="font-bold text-2xl text-primary-600">+7,300 TND</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )
+          },
+          {
+            title: 'Analyse automatique',
+            description: 'Indicateurs et recommandations IA',
+            component: (
+              <div className="bg-white rounded-xl p-6 shadow-lg">
+                <h4 className="font-bold text-lg mb-4">Analyse Financière Automatique</h4>
+                <div className="grid grid-cols-3 gap-4 mb-6">
+                  <div className="bg-green-50 p-4 rounded-lg text-center">
+                    <p className="text-2xl font-bold text-green-600">47%</p>
+                    <p className="text-sm text-gray-600">Marge nette</p>
+                  </div>
+                  <div className="bg-blue-50 p-4 rounded-lg text-center">
+                    <p className="text-2xl font-bold text-blue-600">1.8</p>
+                    <p className="text-sm text-gray-600">Ratio liquidité</p>
+                  </div>
+                  <div className="bg-purple-50 p-4 rounded-lg text-center">
+                    <p className="text-2xl font-bold text-purple-600">+23%</p>
+                    <p className="text-sm text-gray-600">Croissance</p>
+                  </div>
+                </div>
+                <div className="bg-gradient-to-r from-primary-50 to-indigo-50 p-4 rounded-lg border border-primary-200">
+                  <div className="flex items-start gap-3">
+                    <div className="w-8 h-8 bg-primary-500 rounded-full flex items-center justify-center text-white text-sm">IA</div>
+                    <div>
+                      <p className="font-medium text-primary-800">Recommandation IA</p>
+                      <p className="text-sm text-gray-600 mt-1">Votre marge nette est excellente (47%). Considérez d'investir dans l'expansion pour maintenir cette croissance.</p>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -507,7 +655,20 @@ const ProductDemo = () => {
             <h2 className="text-xl font-bold">Démonstration interactive</h2>
             <p className="text-white/80">Découvrez les fonctionnalités avant d'activer</p>
           </div>
-          {user?.subscription === 'enterprise' ? (
+          {userProduct?.status === 'active' ? (
+            <Link
+              to={productRedirects[slug] || '/mes-offres'}
+              className="px-6 py-3 bg-green-500 text-white rounded-xl font-semibold hover:bg-green-600 transition-colors flex items-center gap-2"
+            >
+              <Check className="w-5 h-5" />
+              Accéder à la fonctionnalité
+            </Link>
+          ) : userProduct?.status === 'pending' ? (
+            <div className="px-6 py-3 bg-yellow-500 text-white rounded-xl font-semibold flex items-center gap-2">
+              <Clock className="w-5 h-5" />
+              En attente d'approbation
+            </div>
+          ) : user?.subscription === 'enterprise' ? (
             <button
               onClick={handleActivate}
               disabled={activating}
@@ -565,7 +726,17 @@ const ProductDemo = () => {
         <div className="text-center py-6">
           <h3 className="text-xl font-bold text-gray-900 mb-2">Prêt à commencer ?</h3>
           <p className="text-gray-600 mb-4">Activez ce module et commencez à gérer votre comptabilité</p>
-          {user?.subscription === 'enterprise' ? (
+          {userProduct?.status === 'active' ? (
+            <Link to={productRedirects[slug] || '/mes-offres'} className="btn-primary px-8 py-3 inline-flex items-center gap-2 bg-green-600 hover:bg-green-700">
+              <Check className="w-5 h-5" />
+              Accéder à la fonctionnalité
+            </Link>
+          ) : userProduct?.status === 'pending' ? (
+            <div className="btn-primary px-8 py-3 inline-flex items-center gap-2 bg-yellow-500">
+              <Clock className="w-5 h-5" />
+              En attente d'approbation
+            </div>
+          ) : user?.subscription === 'enterprise' ? (
             <button
               onClick={handleActivate}
               disabled={activating}

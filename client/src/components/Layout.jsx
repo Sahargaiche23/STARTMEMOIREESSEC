@@ -16,7 +16,9 @@ import {
   Receipt,
   FileText,
   ChevronDown,
-  ChevronRight
+  ChevronRight,
+  BarChart3,
+  Check
 } from 'lucide-react';
 import useAuthStore from '../store/authStore';
 import NotificationBell from './NotificationBell';
@@ -56,7 +58,12 @@ const Layout = ({ children }) => {
   };
 
   const accountingProducts = activeProducts.filter(p => 
-    p.categoryName === 'Comptabilité & Gestion' || p.slug?.includes('comptabilite') || p.slug?.includes('pack-comptabilite')
+    p.categoryName === 'Comptabilité & Gestion' || 
+    p.slug?.includes('comptabilite') || 
+    p.slug?.includes('pack-comptabilite') ||
+    p.slug === 'bilan-auto' ||
+    p.slug === 'tva-tunisie' ||
+    p.slug === 'export-expert'
   );
   const hasAccountingModule = activeModules.length > 0 || accountingProducts.length > 0;
   const isEnterprise = user?.subscription === 'enterprise';
@@ -107,13 +114,14 @@ const Layout = ({ children }) => {
   // Get unique features from all activated products
   const getAccountingNav = () => {
     const allFeatures = [];
-    const seenHrefs = new Set();
+    const seenKeys = new Set();
     
     accountingProducts.forEach(product => {
       const features = productFeatures[product.slug] || [];
       features.forEach(feature => {
-        if (!seenHrefs.has(feature.href)) {
-          seenHrefs.add(feature.href);
+        const key = `${feature.name}-${feature.href}`;
+        if (!seenKeys.has(key)) {
+          seenKeys.add(key);
           allFeatures.push(feature);
         }
       });
@@ -225,16 +233,38 @@ const Layout = ({ children }) => {
                 <p className="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
                   Offres Actives
                 </p>
-                <div className="space-y-1">
-                  {activeProducts.slice(0, 3).map((product) => (
-                    <div
-                      key={product.id}
-                      className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 bg-green-50 rounded-lg"
-                    >
-                      <div className="w-2 h-2 bg-green-500 rounded-full flex-shrink-0" />
-                      <span className="truncate">{product.productName}</span>
-                    </div>
-                  ))}
+                <div className="space-y-3">
+                  {activeProducts.slice(0, 3).map((product) => {
+                    const productFeaturesMap = {
+                      'bilan-auto': ['Bilan actif/passif', 'Analyse automatique', 'Format standard tunisien'],
+                      'comptabilite-lite': ['Saisie revenus/dépenses', 'Calcul automatique', 'Export PDF'],
+                      'comptabilite-pro': ['Bilan automatique', 'Compte de résultat', 'Cash Flow', 'Prévision financière'],
+                      'tva-tunisie': ['Calcul TVA 19%/7%', 'Déclaration mensuelle', 'Export administration'],
+                      'export-expert': ['Format FEC', 'Export Excel/PDF', 'Partage sécurisé'],
+                    };
+                    const features = productFeaturesMap[product.slug] || [];
+                    return (
+                      <div key={product.id} className="px-3">
+                        <Link
+                          to={`/produit/demo/${product.slug}`}
+                          className="flex items-center gap-2 text-sm font-medium text-green-700 mb-2 hover:text-green-800"
+                        >
+                          <div className="w-2 h-2 bg-green-500 rounded-full flex-shrink-0" />
+                          <span>{product.productName}</span>
+                        </Link>
+                        {features.length > 0 && (
+                          <div className="ml-4 space-y-1">
+                            {features.map((feature, idx) => (
+                              <div key={idx} className="flex items-center gap-2 text-xs text-gray-600">
+                                <Check className="w-3 h-3 text-green-500 flex-shrink-0" />
+                                <span>{feature}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                   {activeProducts.length > 3 && (
                     <Link
                       to="/mes-offres"

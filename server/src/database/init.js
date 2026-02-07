@@ -323,6 +323,21 @@ db.exec(`
     FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE,
     FOREIGN KEY (projectId) REFERENCES projects(id) ON DELETE SET NULL
   );
+
+  -- Accountant shares table
+  CREATE TABLE IF NOT EXISTS accountant_shares (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    userId INTEGER NOT NULL,
+    accountantEmail TEXT NOT NULL,
+    accountantName TEXT,
+    accessToken TEXT UNIQUE NOT NULL,
+    startDate TEXT,
+    endDate TEXT,
+    expiresAt DATETIME NOT NULL,
+    viewedAt DATETIME,
+    createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE
+  );
 `);
 
 console.log('✅ Database initialized successfully');

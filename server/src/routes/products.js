@@ -256,7 +256,7 @@ router.post('/activate', authMiddleware, (req, res) => {
 router.get('/my-products', authMiddleware, (req, res) => {
   try {
     const products = db.prepare(`
-      SELECT up.*, p.name, p.slug, p.description, p.icon, p.price as unitPrice,
+      SELECT up.*, p.name as productName, p.slug, p.description, p.icon, p.price as unitPrice,
              pc.name as categoryName, pc.color,
              julianday(up.expiresAt) - julianday('now') as daysRemaining
       FROM user_products up

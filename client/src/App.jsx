@@ -35,6 +35,7 @@ import AccountingTransactions from './pages/accounting/AccountingTransactions';
 import AccountingBilan from './pages/accounting/AccountingBilan';
 import AccountingTVA from './pages/accounting/AccountingTVA';
 import AccountingExport from './pages/accounting/AccountingExport';
+import SharedAccountingData from './pages/accounting/SharedAccountingData';
 import ProductDemo from './pages/ProductDemo';
 
 const ProtectedRoute = ({ children }) => {
@@ -249,6 +250,7 @@ function App() {
             </Layout>
           </ProtectedRoute>
         } />
+        <Route path="/comptabilite/shared/:token" element={<SharedAccountingData />} />
         
         {/* Admin Routes */}
         <Route path="/admin/login" element={<AdminLogin />} />
