@@ -14,6 +14,7 @@ const AccountingDashboard = () => {
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
+  const [activeProducts, setActiveProducts] = useState([]);
   const [newTransaction, setNewTransaction] = useState({
     type: 'revenue',
     category: '',
@@ -23,6 +24,30 @@ const AccountingDashboard = () => {
     paymentMethod: 'virement',
     reference: ''
   });
+
+  // Define which features are available per product
+  const productFeatures = {
+    'pack-comptabilite-complet': ['transactions', 'bilan', 'tva', 'export'],
+    'comptabilite-lite': ['transactions', 'export'],
+    'comptabilite-pro': ['transactions', 'bilan'],
+    'bilan-auto': ['bilan'],
+    'tva-tunisie': ['tva'],
+    'export-expert': ['export'],
+  };
+
+  // Get available features based on active products
+  const getAvailableFeatures = () => {
+    const features = new Set();
+    activeProducts.forEach(product => {
+      const productSlug = product.slug;
+      const featureList = productFeatures[productSlug] || [];
+      featureList.forEach(f => features.add(f));
+    });
+    return features;
+  };
+
+  const availableFeatures = getAvailableFeatures();
+  const hasFeature = (feature) => availableFeatures.has(feature);
 
   const revenueCategories = [
     'Ventes produits', 'Prestations services', 'Abonnements', 'Commissions', 'Autres revenus'
@@ -51,7 +76,18 @@ const AccountingDashboard = () => {
 
   useEffect(() => {
     fetchSummary();
+    fetchActiveProducts();
   }, [selectedYear, selectedMonth]);
+
+  const fetchActiveProducts = async () => {
+    try {
+      const res = await api.get('/products/my-products');
+      const active = (res.data.products || []).filter(p => p.status === 'active');
+      setActiveProducts(active);
+    } catch (error) {
+      console.error('Error fetching products:', error);
+    }
+  };
 
   const fetchSummary = async () => {
     try {
@@ -210,55 +246,73 @@ const AccountingDashboard = () => {
         </div>
       </div>
 
-      {/* Quick Actions */}
+      {/* Quick Actions - Only show features user has access to */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Link to="/comptabilite/transactions" className="card hover:shadow-lg transition-shadow cursor-pointer group">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center group-hover:bg-blue-200 transition-colors">
-              <Receipt className="w-5 h-5 text-blue-600" />
+        {hasFeature('transactions') && (
+          <Link to="/comptabilite/transactions" className="card hover:shadow-lg transition-shadow cursor-pointer group">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center group-hover:bg-blue-200 transition-colors">
+                <Receipt className="w-5 h-5 text-blue-600" />
+              </div>
+              <div>
+                <p className="font-medium text-gray-900">Transactions</p>
+                <p className="text-sm text-gray-500">Voir toutes</p>
+              </div>
             </div>
-            <div>
-              <p className="font-medium text-gray-900">Transactions</p>
-              <p className="text-sm text-gray-500">Voir toutes</p>
-            </div>
-          </div>
-        </Link>
+          </Link>
+        )}
 
-        <Link to="/comptabilite/bilan" className="card hover:shadow-lg transition-shadow cursor-pointer group">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center group-hover:bg-green-200 transition-colors">
-              <FileText className="w-5 h-5 text-green-600" />
+        {hasFeature('bilan') && (
+          <Link to="/comptabilite/bilan" className="card hover:shadow-lg transition-shadow cursor-pointer group">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center group-hover:bg-green-200 transition-colors">
+                <FileText className="w-5 h-5 text-green-600" />
+              </div>
+              <div>
+                <p className="font-medium text-gray-900">Bilan</p>
+                <p className="text-sm text-gray-500">Actif/Passif</p>
+              </div>
             </div>
-            <div>
-              <p className="font-medium text-gray-900">Bilan</p>
-              <p className="text-sm text-gray-500">Actif/Passif</p>
-            </div>
-          </div>
-        </Link>
+          </Link>
+        )}
 
-        <Link to="/comptabilite/tva" className="card hover:shadow-lg transition-shadow cursor-pointer group">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center group-hover:bg-orange-200 transition-colors">
-              <Calculator className="w-5 h-5 text-orange-600" />
+        {hasFeature('tva') && (
+          <Link to="/comptabilite/tva" className="card hover:shadow-lg transition-shadow cursor-pointer group">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center group-hover:bg-orange-200 transition-colors">
+                <Calculator className="w-5 h-5 text-orange-600" />
+              </div>
+              <div>
+                <p className="font-medium text-gray-900">TVA</p>
+                <p className="text-sm text-gray-500">Déclarations</p>
+              </div>
             </div>
-            <div>
-              <p className="font-medium text-gray-900">TVA</p>
-              <p className="text-sm text-gray-500">Déclarations</p>
-            </div>
-          </div>
-        </Link>
+          </Link>
+        )}
 
-        <Link to="/comptabilite/export" className="card hover:shadow-lg transition-shadow cursor-pointer group">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center group-hover:bg-purple-200 transition-colors">
-              <Download className="w-5 h-5 text-purple-600" />
+        {hasFeature('export') && (
+          <Link to="/comptabilite/export" className="card hover:shadow-lg transition-shadow cursor-pointer group">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center group-hover:bg-purple-200 transition-colors">
+                <Download className="w-5 h-5 text-purple-600" />
+              </div>
+              <div>
+                <p className="font-medium text-gray-900">Export</p>
+                <p className="text-sm text-gray-500">PDF/Excel</p>
+              </div>
             </div>
-            <div>
-              <p className="font-medium text-gray-900">Export</p>
-              <p className="text-sm text-gray-500">PDF/Excel</p>
-            </div>
+          </Link>
+        )}
+
+        {/* Show upgrade message if no features */}
+        {availableFeatures.size === 0 && (
+          <div className="col-span-full text-center py-8 bg-gray-50 rounded-xl">
+            <p className="text-gray-500">Activez une offre comptabilité pour accéder aux fonctionnalités</p>
+            <Link to="/entreprise/produits-solutions" className="text-primary-600 font-medium hover:underline">
+              Voir les offres →
+            </Link>
           </div>
-        </Link>
+        )}
       </div>
 
       {/* Charts & Recent */}
@@ -375,7 +429,11 @@ const AccountingDashboard = () => {
               <div className="flex gap-2">
                 <button
                   type="button"
-                  onClick={() => setNewTransaction({ ...newTransaction, type: 'revenue', category: '' })}
+                  onClick={() => {
+                    if (newTransaction.type !== 'revenue') {
+                      setNewTransaction({ ...newTransaction, type: 'revenue', category: '' });
+                    }
+                  }}
                   className={`flex-1 py-3 rounded-xl font-medium transition-colors ${
                     newTransaction.type === 'revenue'
                       ? 'bg-green-500 text-white'
@@ -387,7 +445,11 @@ const AccountingDashboard = () => {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setNewTransaction({ ...newTransaction, type: 'expense', category: '' })}
+                  onClick={() => {
+                    if (newTransaction.type !== 'expense') {
+                      setNewTransaction({ ...newTransaction, type: 'expense', category: '' });
+                    }
+                  }}
                   className={`flex-1 py-3 rounded-xl font-medium transition-colors ${
                     newTransaction.type === 'expense'
                       ? 'bg-red-500 text-white'

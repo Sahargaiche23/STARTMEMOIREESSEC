@@ -55,16 +55,16 @@ const Layout = ({ children }) => {
     }
   };
 
-  const hasAccountingModule = activeModules.length > 0 || activeProducts.some(p => 
-    p.categoryName === 'Comptabilité & Gestion' || p.slug?.includes('comptabilite')
+  const accountingProducts = activeProducts.filter(p => 
+    p.categoryName === 'Comptabilité & Gestion' || p.slug?.includes('comptabilite') || p.slug?.includes('pack-comptabilite')
   );
+  const hasAccountingModule = activeModules.length > 0 || accountingProducts.length > 0;
   const isEnterprise = user?.subscription === 'enterprise';
 
   const navigation = [
     { name: 'Tableau de bord', href: '/dashboard', icon: LayoutDashboard },
     { name: 'Mes Projets', href: '/projects', icon: FolderOpen },
     { name: 'Générateur d\'idées', href: '/ideas', icon: Lightbulb },
-    // Show "Produits & Solutions" only for enterprise users
     ...(isEnterprise ? [
       { name: 'Produits & Solutions', href: '/entreprise/produits-solutions', icon: Package },
       { name: 'Mes Offres', href: '/mes-offres', icon: CreditCard },
@@ -74,13 +74,57 @@ const Layout = ({ children }) => {
     { name: 'Mon Profil', href: '/profile', icon: User },
   ];
 
-  const accountingNav = [
-    { name: 'Tableau de bord', href: '/comptabilite', icon: LayoutDashboard },
-    { name: 'Transactions', href: '/comptabilite/transactions', icon: Receipt },
-    { name: 'Bilan & Résultat', href: '/comptabilite/bilan', icon: FileText },
-    { name: 'TVA Tunisie', href: '/comptabilite/tva', icon: Calculator },
-    { name: 'Export', href: '/comptabilite/export', icon: FileText },
-  ];
+  // Define features available per product slug
+  const productFeatures = {
+    'pack-comptabilite-complet': [
+      { name: 'Tableau de bord', href: '/comptabilite', icon: LayoutDashboard },
+      { name: 'Transactions', href: '/comptabilite/transactions', icon: Receipt },
+      { name: 'Bilan & Résultat', href: '/comptabilite/bilan', icon: FileText },
+      { name: 'TVA Tunisie', href: '/comptabilite/tva', icon: Calculator },
+      { name: 'Export', href: '/comptabilite/export', icon: FileText },
+    ],
+    'comptabilite-lite': [
+      { name: 'Tableau de bord', href: '/comptabilite', icon: LayoutDashboard },
+      { name: 'Transactions', href: '/comptabilite/transactions', icon: Receipt },
+      { name: 'Export', href: '/comptabilite/export', icon: FileText },
+    ],
+    'comptabilite-pro': [
+      { name: 'Tableau de bord', href: '/comptabilite', icon: LayoutDashboard },
+      { name: 'Transactions', href: '/comptabilite/transactions', icon: Receipt },
+      { name: 'Bilan & Résultat', href: '/comptabilite/bilan', icon: FileText },
+    ],
+    'bilan-auto': [
+      { name: 'Bilan & Résultat', href: '/comptabilite/bilan', icon: FileText },
+    ],
+    'tva-tunisie': [
+      { name: 'TVA Tunisie', href: '/comptabilite/tva', icon: Calculator },
+    ],
+    'export-expert': [
+      { name: 'Export', href: '/comptabilite/export', icon: FileText },
+    ],
+  };
+
+  // Get unique features from all activated products
+  const getAccountingNav = () => {
+    const allFeatures = [];
+    const seenHrefs = new Set();
+    
+    accountingProducts.forEach(product => {
+      const features = productFeatures[product.slug] || [];
+      features.forEach(feature => {
+        if (!seenHrefs.has(feature.href)) {
+          seenHrefs.add(feature.href);
+          allFeatures.push(feature);
+        }
+      });
+    });
+    
+    // Sort by a logical order
+    const order = ['/comptabilite', '/comptabilite/transactions', '/comptabilite/bilan', '/comptabilite/tva', '/comptabilite/export'];
+    return allFeatures.sort((a, b) => order.indexOf(a.href) - order.indexOf(b.href));
+  };
+
+  const accountingNav = getAccountingNav();
 
   const handleLogout = () => {
     logout();
