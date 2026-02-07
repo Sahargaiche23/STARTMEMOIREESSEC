@@ -248,6 +248,81 @@ db.exec(`
     FOREIGN KEY (approvedBy) REFERENCES users(id) ON DELETE SET NULL,
     UNIQUE(userId, productId, projectId)
   );
+
+  -- Accounting transactions table
+  CREATE TABLE IF NOT EXISTS accounting_transactions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    userId INTEGER NOT NULL,
+    projectId INTEGER,
+    type TEXT NOT NULL,
+    category TEXT NOT NULL,
+    description TEXT,
+    amount REAL NOT NULL,
+    date DATE NOT NULL,
+    paymentMethod TEXT,
+    reference TEXT,
+    notes TEXT,
+    isRecurring INTEGER DEFAULT 0,
+    recurringFrequency TEXT,
+    createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (projectId) REFERENCES projects(id) ON DELETE SET NULL
+  );
+
+  -- Accounting categories table
+  CREATE TABLE IF NOT EXISTS accounting_categories (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    userId INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    type TEXT NOT NULL,
+    icon TEXT,
+    color TEXT,
+    isDefault INTEGER DEFAULT 0,
+    FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE
+  );
+
+  -- Invoices table
+  CREATE TABLE IF NOT EXISTS invoices (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    userId INTEGER NOT NULL,
+    projectId INTEGER,
+    invoiceNumber TEXT NOT NULL,
+    clientName TEXT NOT NULL,
+    clientEmail TEXT,
+    clientAddress TEXT,
+    items TEXT,
+    subtotal REAL NOT NULL,
+    taxRate REAL DEFAULT 19,
+    taxAmount REAL,
+    total REAL NOT NULL,
+    status TEXT DEFAULT 'draft',
+    dueDate DATE,
+    paidAt DATETIME,
+    createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (projectId) REFERENCES projects(id) ON DELETE SET NULL
+  );
+
+  -- VAT declarations table
+  CREATE TABLE IF NOT EXISTS vat_declarations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    userId INTEGER NOT NULL,
+    projectId INTEGER,
+    period TEXT NOT NULL,
+    year INTEGER NOT NULL,
+    month INTEGER,
+    quarter INTEGER,
+    salesAmount REAL DEFAULT 0,
+    purchasesAmount REAL DEFAULT 0,
+    vatCollected REAL DEFAULT 0,
+    vatDeductible REAL DEFAULT 0,
+    vatDue REAL DEFAULT 0,
+    status TEXT DEFAULT 'draft',
+    submittedAt DATETIME,
+    createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (projectId) REFERENCES projects(id) ON DELETE SET NULL
+  );
 `);
 
 console.log('✅ Database initialized successfully');

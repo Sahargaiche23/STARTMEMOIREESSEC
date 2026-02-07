@@ -30,6 +30,12 @@ import AdminUsers from './pages/admin/AdminUsers';
 import AdminPayments from './pages/admin/AdminPayments';
 import AdminProjects from './pages/admin/AdminProjects';
 import AdminProducts from './pages/admin/AdminProducts';
+import AccountingDashboard from './pages/accounting/AccountingDashboard';
+import AccountingTransactions from './pages/accounting/AccountingTransactions';
+import AccountingBilan from './pages/accounting/AccountingBilan';
+import AccountingTVA from './pages/accounting/AccountingTVA';
+import AccountingExport from './pages/accounting/AccountingExport';
+import ProductDemo from './pages/ProductDemo';
 
 const ProtectedRoute = ({ children }) => {
   const { isAuthenticated } = useAuthStore();
@@ -192,10 +198,54 @@ function App() {
             </Layout>
           </ProtectedRoute>
         } />
+        <Route path="/produit/demo/:slug" element={
+          <ProtectedRoute>
+            <Layout>
+              <ProductDemo />
+            </Layout>
+          </ProtectedRoute>
+        } />
         <Route path="/mes-offres" element={
           <ProtectedRoute>
             <Layout>
               <MySubscriptions />
+            </Layout>
+          </ProtectedRoute>
+        } />
+        
+        {/* Accounting Routes */}
+        <Route path="/comptabilite" element={
+          <ProtectedRoute>
+            <Layout>
+              <AccountingDashboard />
+            </Layout>
+          </ProtectedRoute>
+        } />
+        <Route path="/comptabilite/transactions" element={
+          <ProtectedRoute>
+            <Layout>
+              <AccountingTransactions />
+            </Layout>
+          </ProtectedRoute>
+        } />
+        <Route path="/comptabilite/bilan" element={
+          <ProtectedRoute>
+            <Layout>
+              <AccountingBilan />
+            </Layout>
+          </ProtectedRoute>
+        } />
+        <Route path="/comptabilite/tva" element={
+          <ProtectedRoute>
+            <Layout>
+              <AccountingTVA />
+            </Layout>
+          </ProtectedRoute>
+        } />
+        <Route path="/comptabilite/export" element={
+          <ProtectedRoute>
+            <Layout>
+              <AccountingExport />
             </Layout>
           </ProtectedRoute>
         } />

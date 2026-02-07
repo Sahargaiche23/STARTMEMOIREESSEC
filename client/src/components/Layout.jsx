@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { 
   LayoutDashboard, 
@@ -11,24 +11,75 @@ import {
   Rocket,
   CreditCard,
   Shield,
-  Package
+  Package,
+  Calculator,
+  Receipt,
+  FileText,
+  ChevronDown,
+  ChevronRight
 } from 'lucide-react';
 import useAuthStore from '../store/authStore';
 import NotificationBell from './NotificationBell';
+import api from '../utils/api';
 
 const Layout = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [accountingOpen, setAccountingOpen] = useState(false);
+  const [activeModules, setActiveModules] = useState([]);
+  const [activeProducts, setActiveProducts] = useState([]);
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuthStore();
+
+  useEffect(() => {
+    fetchActiveModules();
+    fetchActiveProducts();
+  }, []);
+
+  const fetchActiveModules = async () => {
+    try {
+      const res = await api.get('/accounting/my-modules');
+      setActiveModules(res.data.modules || []);
+    } catch (error) {
+      console.error('Error fetching modules:', error);
+    }
+  };
+
+  const fetchActiveProducts = async () => {
+    try {
+      const res = await api.get('/products/my-products');
+      const active = (res.data.products || []).filter(p => p.status === 'active');
+      setActiveProducts(active);
+    } catch (error) {
+      console.error('Error fetching products:', error);
+    }
+  };
+
+  const hasAccountingModule = activeModules.length > 0 || activeProducts.some(p => 
+    p.categoryName === 'Comptabilité & Gestion' || p.slug?.includes('comptabilite')
+  );
+  const isEnterprise = user?.subscription === 'enterprise';
 
   const navigation = [
     { name: 'Tableau de bord', href: '/dashboard', icon: LayoutDashboard },
     { name: 'Mes Projets', href: '/projects', icon: FolderOpen },
     { name: 'Générateur d\'idées', href: '/ideas', icon: Lightbulb },
-    { name: 'Produits & Solutions', href: '/entreprise/produits-solutions', icon: Package },
-    { name: 'Mes Offres', href: '/mes-offres', icon: CreditCard },
+    // Show "Produits & Solutions" only for enterprise users
+    ...(isEnterprise ? [
+      { name: 'Produits & Solutions', href: '/entreprise/produits-solutions', icon: Package },
+      { name: 'Mes Offres', href: '/mes-offres', icon: CreditCard },
+    ] : [
+      { name: 'Abonnement', href: '/pricing', icon: CreditCard },
+    ]),
     { name: 'Mon Profil', href: '/profile', icon: User },
+  ];
+
+  const accountingNav = [
+    { name: 'Tableau de bord', href: '/comptabilite', icon: LayoutDashboard },
+    { name: 'Transactions', href: '/comptabilite/transactions', icon: Receipt },
+    { name: 'Bilan & Résultat', href: '/comptabilite/bilan', icon: FileText },
+    { name: 'TVA Tunisie', href: '/comptabilite/tva', icon: Calculator },
+    { name: 'Export', href: '/comptabilite/export', icon: FileText },
   ];
 
   const handleLogout = () => {
@@ -84,6 +135,73 @@ const Layout = ({ children }) => {
                 </Link>
               );
             })}
+
+            {/* Accounting Module - Only show if user has active subscription */}
+            {hasAccountingModule && (
+              <div className="mt-4 pt-4 border-t border-gray-200">
+                <button
+                  onClick={() => setAccountingOpen(!accountingOpen)}
+                  className="w-full flex items-center justify-between px-3 py-2 text-sm font-medium text-green-700 bg-green-50 rounded-lg hover:bg-green-100 transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    <Calculator className="w-5 h-5" />
+                    <span>Comptabilité</span>
+                  </div>
+                  {accountingOpen ? (
+                    <ChevronDown className="w-4 h-4" />
+                  ) : (
+                    <ChevronRight className="w-4 h-4" />
+                  )}
+                </button>
+                
+                {accountingOpen && (
+                  <div className="mt-1 ml-2 space-y-1">
+                    {accountingNav.map((item) => {
+                      const isActive = location.pathname === item.href;
+                      return (
+                        <Link
+                          key={item.name}
+                          to={item.href}
+                          className={`sidebar-link text-sm ${isActive ? 'active' : ''}`}
+                          onClick={() => setSidebarOpen(false)}
+                        >
+                          <item.icon className="w-4 h-4" />
+                          <span>{item.name}</span>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Active Products Summary */}
+            {activeProducts.length > 0 && (
+              <div className="mt-4 pt-4 border-t border-gray-200">
+                <p className="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
+                  Offres Actives
+                </p>
+                <div className="space-y-1">
+                  {activeProducts.slice(0, 3).map((product) => (
+                    <div
+                      key={product.id}
+                      className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 bg-green-50 rounded-lg"
+                    >
+                      <div className="w-2 h-2 bg-green-500 rounded-full flex-shrink-0" />
+                      <span className="truncate">{product.productName}</span>
+                    </div>
+                  ))}
+                  {activeProducts.length > 3 && (
+                    <Link
+                      to="/mes-offres"
+                      className="block px-3 py-1 text-xs text-primary-600 hover:underline"
+                    >
+                      +{activeProducts.length - 3} autres offres
+                    </Link>
+                  )}
+                </div>
+              </div>
+            )}
             
           </nav>
 

@@ -13,7 +13,9 @@ import {
   ArrowRight,
   ChevronRight,
   Search,
-  Filter
+  Filter,
+  Play,
+  Eye
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../utils/api';
@@ -265,20 +267,31 @@ const ProductsSolutions = () => {
                         </div>
                       </div>
                       
-                      {isProductActivated(product.id) ? (
-                        <span className="flex items-center gap-2 px-4 py-2 bg-green-100 text-green-700 rounded-xl text-sm font-medium">
-                          <Check className="w-4 h-4" />
-                          Activé
-                        </span>
-                      ) : (
-                        <button
-                          onClick={() => handleActivateProduct(product.id)}
-                          className="flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-sm font-medium transition-colors group-hover:shadow-md"
+                      <div className="flex items-center gap-2">
+                        {/* Demo Button */}
+                        <Link
+                          to={`/produit/demo/${product.slug}`}
+                          className="flex items-center gap-1 px-3 py-2 border border-gray-300 text-gray-700 hover:bg-gray-50 rounded-xl text-sm font-medium transition-colors"
                         >
-                          Activer
-                          <ArrowRight className="w-4 h-4" />
-                        </button>
-                      )}
+                          <Eye className="w-4 h-4" />
+                          Demo
+                        </Link>
+                        
+                        {isProductActivated(product.id) ? (
+                          <span className="flex items-center gap-2 px-4 py-2 bg-green-100 text-green-700 rounded-xl text-sm font-medium">
+                            <Check className="w-4 h-4" />
+                            Activé
+                          </span>
+                        ) : (
+                          <button
+                            onClick={() => handleActivateProduct(product.id)}
+                            className="flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-sm font-medium transition-colors group-hover:shadow-md"
+                          >
+                            Activer
+                            <ArrowRight className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 ))}

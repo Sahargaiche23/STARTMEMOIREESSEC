@@ -10,6 +10,14 @@ const api = axios.create({
 // Request interceptor to add auth token
 api.interceptors.request.use(
   (config) => {
+    // First check for admin token in sessionStorage
+    const adminToken = sessionStorage.getItem('admin-token');
+    if (adminToken) {
+      config.headers.Authorization = `Bearer ${adminToken}`;
+      return config;
+    }
+    
+    // Then check for user token in localStorage
     const authStorage = localStorage.getItem('auth-storage');
     if (authStorage) {
       const { state } = JSON.parse(authStorage);

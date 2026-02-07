@@ -369,10 +369,12 @@ router.post('/renew/:userProductId', authMiddleware, (req, res) => {
 // Get all pending product requests (admin)
 router.get('/admin/requests', authMiddleware, (req, res) => {
   try {
-    // Check if admin
-    const user = db.prepare('SELECT role FROM users WHERE id = ?').get(req.user.userId);
-    if (user?.role !== 'admin') {
-      return res.status(403).json({ message: 'Accès non autorisé' });
+    // Check if admin (either isAdmin flag or role in DB)
+    if (!req.user.isAdmin) {
+      const user = db.prepare('SELECT role FROM users WHERE id = ?').get(req.user.userId);
+      if (user?.role !== 'admin') {
+        return res.status(403).json({ message: 'Accès non autorisé' });
+      }
     }
 
     const requests = db.prepare(`
@@ -398,10 +400,12 @@ router.get('/admin/requests', authMiddleware, (req, res) => {
 // Get all product subscriptions (admin)
 router.get('/admin/subscriptions', authMiddleware, (req, res) => {
   try {
-    // Check if admin
-    const user = db.prepare('SELECT role FROM users WHERE id = ?').get(req.user.userId);
-    if (user?.role !== 'admin') {
-      return res.status(403).json({ message: 'Accès non autorisé' });
+    // Check if admin (either isAdmin flag or role in DB)
+    if (!req.user.isAdmin) {
+      const user = db.prepare('SELECT role FROM users WHERE id = ?').get(req.user.userId);
+      if (user?.role !== 'admin') {
+        return res.status(403).json({ message: 'Accès non autorisé' });
+      }
     }
 
     const subscriptions = db.prepare(`
@@ -434,10 +438,12 @@ router.get('/admin/subscriptions', authMiddleware, (req, res) => {
 // Approve product request (admin)
 router.post('/admin/approve/:requestId', authMiddleware, (req, res) => {
   try {
-    // Check if admin
-    const admin = db.prepare('SELECT role FROM users WHERE id = ?').get(req.user.userId);
-    if (admin?.role !== 'admin') {
-      return res.status(403).json({ message: 'Accès non autorisé' });
+    // Check if admin (either isAdmin flag or role in DB)
+    if (!req.user.isAdmin) {
+      const admin = db.prepare('SELECT role FROM users WHERE id = ?').get(req.user.userId);
+      if (admin?.role !== 'admin') {
+        return res.status(403).json({ message: 'Accès non autorisé' });
+      }
     }
 
     const request = db.prepare(`
@@ -495,10 +501,12 @@ router.post('/admin/reject/:requestId', authMiddleware, (req, res) => {
   try {
     const { reason } = req.body;
     
-    // Check if admin
-    const admin = db.prepare('SELECT role FROM users WHERE id = ?').get(req.user.userId);
-    if (admin?.role !== 'admin') {
-      return res.status(403).json({ message: 'Accès non autorisé' });
+    // Check if admin (either isAdmin flag or role in DB)
+    if (!req.user.isAdmin) {
+      const admin = db.prepare('SELECT role FROM users WHERE id = ?').get(req.user.userId);
+      if (admin?.role !== 'admin') {
+        return res.status(403).json({ message: 'Accès non autorisé' });
+      }
     }
 
     const request = db.prepare(`
