@@ -17,6 +17,7 @@ import PitchDeckEditor from './pages/PitchDeckEditor';
 import TaskManager from './pages/TaskManager';
 import TeamMembers from './pages/TeamMembers';
 import InviteRegister from './pages/InviteRegister';
+import ProductsSolutions from './pages/ProductsSolutions';
 import Pricing from './pages/Pricing';
 import Profile from './pages/Profile';
 import GoogleCallback from './pages/GoogleCallback';
@@ -179,6 +180,13 @@ function App() {
           <ProtectedRoute>
             <Layout>
               <Profile />
+            </Layout>
+          </ProtectedRoute>
+        } />
+        <Route path="/entreprise/produits-solutions" element={
+          <ProtectedRoute>
+            <Layout>
+              <ProductsSolutions />
             </Layout>
           </ProtectedRoute>
         } />

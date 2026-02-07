@@ -191,6 +191,54 @@ db.exec(`
     createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE
   );
+
+  -- Product categories table
+  CREATE TABLE IF NOT EXISTS product_categories (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    slug TEXT UNIQUE NOT NULL,
+    description TEXT,
+    icon TEXT,
+    color TEXT DEFAULT '#3B82F6',
+    sortOrder INTEGER DEFAULT 0,
+    isActive INTEGER DEFAULT 1,
+    createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  -- Products/Solutions table
+  CREATE TABLE IF NOT EXISTS products (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    categoryId INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    slug TEXT UNIQUE NOT NULL,
+    description TEXT,
+    features TEXT,
+    price REAL DEFAULT 0,
+    priceType TEXT DEFAULT 'monthly',
+    icon TEXT,
+    isPopular INTEGER DEFAULT 0,
+    isNew INTEGER DEFAULT 0,
+    requiredPlan TEXT DEFAULT 'enterprise',
+    isActive INTEGER DEFAULT 1,
+    sortOrder INTEGER DEFAULT 0,
+    createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (categoryId) REFERENCES product_categories(id) ON DELETE CASCADE
+  );
+
+  -- User activated products
+  CREATE TABLE IF NOT EXISTS user_products (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    userId INTEGER NOT NULL,
+    productId INTEGER NOT NULL,
+    projectId INTEGER,
+    status TEXT DEFAULT 'active',
+    activatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+    expiresAt DATETIME,
+    FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (productId) REFERENCES products(id) ON DELETE CASCADE,
+    FOREIGN KEY (projectId) REFERENCES projects(id) ON DELETE SET NULL,
+    UNIQUE(userId, productId, projectId)
+  );
 `);
 
 console.log('✅ Database initialized successfully');

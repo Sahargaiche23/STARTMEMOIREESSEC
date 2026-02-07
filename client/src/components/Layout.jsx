@@ -10,7 +10,8 @@ import {
   X,
   Rocket,
   CreditCard,
-  Shield
+  Shield,
+  Package
 } from 'lucide-react';
 import useAuthStore from '../store/authStore';
 import NotificationBell from './NotificationBell';
@@ -25,6 +26,7 @@ const Layout = ({ children }) => {
     { name: 'Tableau de bord', href: '/dashboard', icon: LayoutDashboard },
     { name: 'Mes Projets', href: '/projects', icon: FolderOpen },
     { name: 'Générateur d\'idées', href: '/ideas', icon: Lightbulb },
+    { name: 'Produits & Solutions', href: '/entreprise/produits-solutions', icon: Package },
     { name: 'Abonnement', href: '/pricing', icon: CreditCard },
     { name: 'Mon Profil', href: '/profile', icon: User },
   ];
