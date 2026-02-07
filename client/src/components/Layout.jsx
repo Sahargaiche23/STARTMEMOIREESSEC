@@ -18,7 +18,11 @@ import {
   ChevronDown,
   ChevronRight,
   BarChart3,
-  Check
+  Check,
+  Users,
+  Calendar,
+  Building2,
+  PenTool
 } from 'lucide-react';
 import useAuthStore from '../store/authStore';
 import NotificationBell from './NotificationBell';
@@ -27,6 +31,7 @@ import api from '../utils/api';
 const Layout = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [accountingOpen, setAccountingOpen] = useState(false);
+  const [hrOpen, setHrOpen] = useState(false);
   const [activeModules, setActiveModules] = useState([]);
   const [activeProducts, setActiveProducts] = useState([]);
   const location = useLocation();
@@ -66,6 +71,18 @@ const Layout = ({ children }) => {
     p.slug === 'export-expert'
   );
   const hasAccountingModule = activeModules.length > 0 || accountingProducts.length > 0;
+  
+  // HR Products detection
+  const hrProducts = activeProducts.filter(p => 
+    p.categoryName === 'Paie & Ressources Humaines' || 
+    p.slug === 'gestion-employes' ||
+    p.slug === 'fiches-paie' ||
+    p.slug === 'declaration-cnss' ||
+    p.slug === 'gestion-conges' ||
+    p.slug === 'signature-contrat'
+  );
+  const hasHrModule = hrProducts.length > 0;
+  
   const isEnterprise = user?.subscription === 'enterprise';
 
   const navigation = [
@@ -109,7 +126,46 @@ const Layout = ({ children }) => {
     'export-expert': [
       { name: 'Export', href: '/comptabilite/export', icon: FileText },
     ],
+    // HR Products
+    'gestion-employes': [
+      { name: 'Employés', href: '/rh/employes', icon: Users },
+    ],
+    'fiches-paie': [
+      { name: 'Fiches de paie', href: '/rh/fiches-paie', icon: FileText },
+    ],
+    'declaration-cnss': [
+      { name: 'CNSS', href: '/rh/cnss', icon: Building2 },
+    ],
+    'gestion-conges': [
+      { name: 'Congés', href: '/rh/conges', icon: Calendar },
+    ],
+    'signature-contrat': [
+      { name: 'Contrats', href: '/rh/contrats', icon: PenTool },
+    ],
   };
+
+  // Get unique HR features from all activated products
+  const getHrNav = () => {
+    const allFeatures = [];
+    const seenKeys = new Set();
+    
+    hrProducts.forEach(product => {
+      const features = productFeatures[product.slug] || [];
+      features.forEach(feature => {
+        const key = `${feature.name}-${feature.href}`;
+        if (!seenKeys.has(key)) {
+          seenKeys.add(key);
+          allFeatures.push(feature);
+        }
+      });
+    });
+    
+    // Sort by a logical order
+    const order = ['/rh/employes', '/rh/fiches-paie', '/rh/cnss', '/rh/conges', '/rh/contrats'];
+    return allFeatures.sort((a, b) => order.indexOf(a.href) - order.indexOf(b.href));
+  };
+
+  const hrNav = getHrNav();
 
   // Get unique features from all activated products
   const getAccountingNav = () => {
@@ -209,6 +265,45 @@ const Layout = ({ children }) => {
                 {accountingOpen && (
                   <div className="mt-1 ml-2 space-y-1">
                     {accountingNav.map((item) => {
+                      const isActive = location.pathname === item.href;
+                      return (
+                        <Link
+                          key={item.name}
+                          to={item.href}
+                          className={`sidebar-link text-sm ${isActive ? 'active' : ''}`}
+                          onClick={() => setSidebarOpen(false)}
+                        >
+                          <item.icon className="w-4 h-4" />
+                          <span>{item.name}</span>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* HR & Payroll Module */}
+            {hasHrModule && (
+              <div className="mt-4 pt-4 border-t border-gray-200">
+                <button
+                  onClick={() => setHrOpen(!hrOpen)}
+                  className="w-full flex items-center justify-between px-3 py-2 text-sm font-medium text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    <Users className="w-5 h-5" />
+                    <span>Paie & RH</span>
+                  </div>
+                  {hrOpen ? (
+                    <ChevronDown className="w-4 h-4" />
+                  ) : (
+                    <ChevronRight className="w-4 h-4" />
+                  )}
+                </button>
+                
+                {hrOpen && (
+                  <div className="mt-1 ml-2 space-y-1">
+                    {hrNav.map((item) => {
                       const isActive = location.pathname === item.href;
                       return (
                         <Link

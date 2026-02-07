@@ -37,6 +37,11 @@ import AccountingTVA from './pages/accounting/AccountingTVA';
 import AccountingExport from './pages/accounting/AccountingExport';
 import SharedAccountingData from './pages/accounting/SharedAccountingData';
 import ProductDemo from './pages/ProductDemo';
+import EmployeeManagement from './pages/hr/EmployeeManagement';
+import Payslips from './pages/hr/Payslips';
+import CNSSDeclaration from './pages/hr/CNSSDeclaration';
+import LeaveManagement from './pages/hr/LeaveManagement';
+import ContractSigning from './pages/hr/ContractSigning';
 
 const ProtectedRoute = ({ children }) => {
   const { isAuthenticated } = useAuthStore();
@@ -251,6 +256,43 @@ function App() {
           </ProtectedRoute>
         } />
         <Route path="/comptabilite/shared/:token" element={<SharedAccountingData />} />
+        
+        {/* HR & Payroll Routes */}
+        <Route path="/rh/employes" element={
+          <ProtectedRoute>
+            <Layout>
+              <EmployeeManagement />
+            </Layout>
+          </ProtectedRoute>
+        } />
+        <Route path="/rh/fiches-paie" element={
+          <ProtectedRoute>
+            <Layout>
+              <Payslips />
+            </Layout>
+          </ProtectedRoute>
+        } />
+        <Route path="/rh/cnss" element={
+          <ProtectedRoute>
+            <Layout>
+              <CNSSDeclaration />
+            </Layout>
+          </ProtectedRoute>
+        } />
+        <Route path="/rh/conges" element={
+          <ProtectedRoute>
+            <Layout>
+              <LeaveManagement />
+            </Layout>
+          </ProtectedRoute>
+        } />
+        <Route path="/rh/contrats" element={
+          <ProtectedRoute>
+            <Layout>
+              <ContractSigning />
+            </Layout>
+          </ProtectedRoute>
+        } />
         
         {/* Admin Routes */}
         <Route path="/admin/login" element={<AdminLogin />} />

@@ -17,6 +17,7 @@ const notificationRoutes = require('./routes/notifications');
 const teamMembersRoutes = require('./routes/teamMembers');
 const productRoutes = require('./routes/products');
 const accountingRoutes = require('./routes/accounting');
+const hrRoutes = require('./routes/hr');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -42,6 +43,7 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/team-members', teamMembersRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/accounting', accountingRoutes);
+app.use('/api/hr', hrRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

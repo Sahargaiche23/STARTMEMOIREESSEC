@@ -338,6 +338,163 @@ db.exec(`
     createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE
   );
+
+  -- ============ HR & PAYROLL TABLES ============
+
+  -- Employees table
+  CREATE TABLE IF NOT EXISTS employees (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    userId INTEGER NOT NULL,
+    firstName TEXT NOT NULL,
+    lastName TEXT NOT NULL,
+    email TEXT,
+    phone TEXT,
+    cin TEXT,
+    cnssNumber TEXT,
+    address TEXT,
+    birthDate DATE,
+    hireDate DATE NOT NULL,
+    endDate DATE,
+    position TEXT NOT NULL,
+    department TEXT,
+    contractType TEXT DEFAULT 'CDI',
+    workSchedule TEXT DEFAULT 'full_time',
+    baseSalary REAL NOT NULL,
+    transportAllowance REAL DEFAULT 0,
+    mealAllowance REAL DEFAULT 0,
+    otherAllowances REAL DEFAULT 0,
+    bankName TEXT,
+    bankAccount TEXT,
+    status TEXT DEFAULT 'active',
+    notes TEXT,
+    createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE
+  );
+
+  -- Employee documents table
+  CREATE TABLE IF NOT EXISTS employee_documents (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    employeeId INTEGER NOT NULL,
+    userId INTEGER NOT NULL,
+    documentType TEXT NOT NULL,
+    documentName TEXT NOT NULL,
+    filePath TEXT,
+    fileData TEXT,
+    uploadedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+    expiresAt DATE,
+    FOREIGN KEY (employeeId) REFERENCES employees(id) ON DELETE CASCADE,
+    FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE
+  );
+
+  -- Payslips table
+  CREATE TABLE IF NOT EXISTS payslips (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    userId INTEGER NOT NULL,
+    employeeId INTEGER NOT NULL,
+    period TEXT NOT NULL,
+    year INTEGER NOT NULL,
+    month INTEGER NOT NULL,
+    baseSalary REAL NOT NULL,
+    transportAllowance REAL DEFAULT 0,
+    mealAllowance REAL DEFAULT 0,
+    otherAllowances REAL DEFAULT 0,
+    overtimeHours REAL DEFAULT 0,
+    overtimeAmount REAL DEFAULT 0,
+    bonus REAL DEFAULT 0,
+    grossSalary REAL NOT NULL,
+    cnssEmployee REAL NOT NULL,
+    cnssEmployer REAL NOT NULL,
+    irpp REAL NOT NULL,
+    otherDeductions REAL DEFAULT 0,
+    netSalary REAL NOT NULL,
+    status TEXT DEFAULT 'draft',
+    paidAt DATETIME,
+    generatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (employeeId) REFERENCES employees(id) ON DELETE CASCADE
+  );
+
+  -- CNSS declarations table
+  CREATE TABLE IF NOT EXISTS cnss_declarations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    userId INTEGER NOT NULL,
+    quarter INTEGER NOT NULL,
+    year INTEGER NOT NULL,
+    totalEmployees INTEGER NOT NULL,
+    totalGrossSalary REAL NOT NULL,
+    totalDaysWorked INTEGER DEFAULT 0,
+    cnssEmployeeTotal REAL NOT NULL,
+    cnssEmployerTotal REAL NOT NULL,
+    totalContributions REAL NOT NULL,
+    status TEXT DEFAULT 'draft',
+    submittedAt DATETIME,
+    dueDate DATE,
+    paidAt DATETIME,
+    referenceNumber TEXT,
+    createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE
+  );
+
+  -- Leave requests table
+  CREATE TABLE IF NOT EXISTS leave_requests (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    userId INTEGER NOT NULL,
+    employeeId INTEGER NOT NULL,
+    leaveType TEXT NOT NULL,
+    startDate DATE NOT NULL,
+    endDate DATE NOT NULL,
+    totalDays INTEGER NOT NULL,
+    reason TEXT,
+    status TEXT DEFAULT 'pending',
+    approvedBy INTEGER,
+    approvedAt DATETIME,
+    rejectionReason TEXT,
+    createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (employeeId) REFERENCES employees(id) ON DELETE CASCADE
+  );
+
+  -- Leave balances table
+  CREATE TABLE IF NOT EXISTS leave_balances (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    userId INTEGER NOT NULL,
+    employeeId INTEGER NOT NULL,
+    year INTEGER NOT NULL,
+    annualLeave INTEGER DEFAULT 24,
+    usedAnnualLeave INTEGER DEFAULT 0,
+    sickLeave INTEGER DEFAULT 15,
+    usedSickLeave INTEGER DEFAULT 0,
+    maternityLeave INTEGER DEFAULT 60,
+    usedMaternityLeave INTEGER DEFAULT 0,
+    unpaidLeave INTEGER DEFAULT 0,
+    FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (employeeId) REFERENCES employees(id) ON DELETE CASCADE,
+    UNIQUE(employeeId, year)
+  );
+
+  -- Contracts table
+  CREATE TABLE IF NOT EXISTS contracts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    userId INTEGER NOT NULL,
+    employeeId INTEGER NOT NULL,
+    contractType TEXT NOT NULL,
+    title TEXT NOT NULL,
+    content TEXT,
+    startDate DATE NOT NULL,
+    endDate DATE,
+    salary REAL NOT NULL,
+    position TEXT NOT NULL,
+    status TEXT DEFAULT 'draft',
+    employerSignedAt DATETIME,
+    employeeSignedAt DATETIME,
+    employerSignature TEXT,
+    employeeSignature TEXT,
+    signatureHash TEXT,
+    createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (employeeId) REFERENCES employees(id) ON DELETE CASCADE
+  );
 `);
 
 console.log('✅ Database initialized successfully');
