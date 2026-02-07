@@ -49,7 +49,7 @@ router.get('/:projectId', authMiddleware, (req, res) => {
   }
 });
 
-// Add team member by email (only owner/admin can add members)
+// Add team member by email (owner/admin/member can add members)
 router.post('/:projectId', authMiddleware, [
   body('email').isEmail().withMessage('Email invalide'),
   body('role').optional().isIn(['admin', 'member', 'viewer']).withMessage('Rôle invalide')
@@ -61,12 +61,17 @@ router.post('/:projectId', authMiddleware, [
     }
 
     const { projectId } = req.params;
-    const { email, role = 'member' } = req.body;
+    let { email, role = 'member' } = req.body;
 
-    // Only owner and admin can add members
-    const access = checkProjectAccess(req.user.userId, projectId, ['owner', 'admin']);
+    // owner/admin/member can add members
+    const access = checkProjectAccess(req.user.userId, projectId, ['owner', 'admin', 'member']);
     if (!access.hasAccess) {
-      return res.status(403).json({ message: 'Seul le propriétaire ou un admin peut ajouter des membres' });
+      return res.status(403).json({ message: 'Accès non autorisé' });
+    }
+    
+    // Members can only add with role 'member' or 'viewer' (not admin)
+    if (access.role === 'member' && role === 'admin') {
+      role = 'member'; // Downgrade to member if a member tries to add admin
     }
     const project = access.project;
 
@@ -132,10 +137,10 @@ router.put('/:projectId/:memberId', authMiddleware, [
     const { projectId, memberId } = req.params;
     const { role } = req.body;
 
-    // Only owner can modify roles
-    const access = checkProjectAccess(req.user.userId, projectId, ['owner']);
+    // Only owner and admin can modify roles
+    const access = checkProjectAccess(req.user.userId, projectId, ['owner', 'admin']);
     if (!access.hasAccess) {
-      return res.status(403).json({ message: 'Seul le propriétaire peut modifier les rôles' });
+      return res.status(403).json({ message: 'Seul le propriétaire ou un admin peut modifier les rôles' });
     }
 
     db.prepare('UPDATE team_members SET role = ? WHERE id = ? AND projectId = ?')

@@ -25,6 +25,7 @@ const TeamMembers = () => {
   const [newMemberEmail, setNewMemberEmail] = useState('');
   const [newMemberRole, setNewMemberRole] = useState('member');
   const [adding, setAdding] = useState(false);
+  const [userRole, setUserRole] = useState(null); // owner, admin, member, viewer
 
   useEffect(() => {
     fetchData();
@@ -38,6 +39,7 @@ const TeamMembers = () => {
       ]);
       setProject(projectRes.data.project);
       setMembers(membersRes.data.members);
+      setUserRole(projectRes.data.userRole || 'owner'); // Get current user's role
     } catch (error) {
       toast.error('Erreur lors du chargement');
     } finally {
@@ -139,13 +141,16 @@ const TeamMembers = () => {
             <p className="text-gray-600">{project?.name}</p>
           </div>
         </div>
-        <button
-          onClick={() => setShowAddModal(true)}
-          className="btn-primary flex items-center gap-2"
-        >
-          <UserPlus className="w-5 h-5" />
-          Ajouter un membre
-        </button>
+        {/* owner, admin, member can add members (viewers cannot) */}
+        {userRole !== 'viewer' && (
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="btn-primary flex items-center gap-2"
+          >
+            <UserPlus className="w-5 h-5" />
+            Ajouter un membre
+          </button>
+        )}
       </div>
 
       {/* Stats */}
@@ -234,23 +239,33 @@ const TeamMembers = () => {
                     {member.status === 'active' ? 'Actif' : 'En attente'}
                   </span>
                   
-                  <select
-                    value={member.role}
-                    onChange={(e) => handleUpdateRole(member.id, e.target.value)}
-                    className={`px-3 py-1.5 rounded-lg text-sm font-medium border-0 cursor-pointer ${getRoleBadge(member.role)}`}
-                  >
-                    <option value="admin">Admin</option>
-                    <option value="member">Membre</option>
-                    <option value="viewer">Lecteur</option>
-                  </select>
+                  {/* Only owner and admin can modify roles */}
+                  {(userRole === 'owner' || userRole === 'admin') ? (
+                    <select
+                      value={member.role}
+                      onChange={(e) => handleUpdateRole(member.id, e.target.value)}
+                      className={`px-3 py-1.5 rounded-lg text-sm font-medium border-0 cursor-pointer ${getRoleBadge(member.role)}`}
+                    >
+                      <option value="admin">Admin</option>
+                      <option value="member">Membre</option>
+                      <option value="viewer">Lecteur</option>
+                    </select>
+                  ) : (
+                    <span className={`px-3 py-1.5 rounded-lg text-sm font-medium ${getRoleBadge(member.role)}`}>
+                      {member.role === 'admin' ? 'Admin' : member.role === 'member' ? 'Membre' : 'Lecteur'}
+                    </span>
+                  )}
 
-                  <button
-                    onClick={() => handleRemoveMember(member.id)}
-                    className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                    title="Retirer le membre"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                  {/* Only owner can remove members */}
+                  {userRole === 'owner' && (
+                    <button
+                      onClick={() => handleRemoveMember(member.id)}
+                      className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                      title="Retirer le membre"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
@@ -336,7 +351,10 @@ const TeamMembers = () => {
                   onChange={(e) => setNewMemberRole(e.target.value)}
                   className="input"
                 >
-                  <option value="admin">Admin - Accès complet</option>
+                  {/* Members can only add member/viewer, not admin */}
+                  {(userRole === 'owner' || userRole === 'admin') && (
+                    <option value="admin">Admin - Accès complet</option>
+                  )}
                   <option value="member">Membre - Peut créer et modifier ses tâches</option>
                   <option value="viewer">Lecteur - Lecture seule</option>
                 </select>
