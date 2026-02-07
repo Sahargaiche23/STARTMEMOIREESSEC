@@ -185,10 +185,10 @@ router.get('/product/:slug', (req, res) => {
   }
 });
 
-// Activate product for user
+// Request product activation (pending admin approval)
 router.post('/activate', authMiddleware, (req, res) => {
   try {
-    const { productId, projectId } = req.body;
+    const { productId, projectId, duration = 1, durationUnit = 'month' } = req.body;
     const userId = req.user.userId;
 
     // Check if product exists
@@ -198,7 +198,7 @@ router.post('/activate', authMiddleware, (req, res) => {
     }
 
     // Check user subscription
-    const user = db.prepare('SELECT subscription FROM users WHERE id = ?').get(userId);
+    const user = db.prepare('SELECT subscription, firstName, lastName FROM users WHERE id = ?').get(userId);
     const planLevels = { free: 0, student: 1, startup: 2, founder: 3, enterprise: 4 };
     const requiredLevel = planLevels[product.requiredPlan] || 0;
     const userLevel = planLevels[user.subscription] || 0;
@@ -210,25 +210,41 @@ router.post('/activate', authMiddleware, (req, res) => {
       });
     }
 
-    // Check if already activated
+    // Check if already requested or activated
     const existing = db.prepare(`
       SELECT * FROM user_products 
-      WHERE userId = ? AND productId = ? AND (projectId = ? OR (projectId IS NULL AND ? IS NULL))
-    `).get(userId, productId, projectId || null, projectId || null);
+      WHERE userId = ? AND productId = ? AND status IN ('pending', 'active')
+    `).get(userId, productId);
 
     if (existing) {
+      if (existing.status === 'pending') {
+        return res.status(400).json({ message: 'Demande déjà en cours de traitement' });
+      }
       return res.status(400).json({ message: 'Produit déjà activé' });
     }
 
-    // Activate product
+    // Calculate price based on duration
+    const totalPrice = product.price * duration;
+
+    // Create activation request (pending)
     const result = db.prepare(`
-      INSERT INTO user_products (userId, productId, projectId, status)
-      VALUES (?, ?, ?, 'active')
-    `).run(userId, productId, projectId || null);
+      INSERT INTO user_products (userId, productId, projectId, status, duration, durationUnit, price, requestedAt)
+      VALUES (?, ?, ?, 'pending', ?, ?, ?, CURRENT_TIMESTAMP)
+    `).run(userId, productId, projectId || null, duration, durationUnit, totalPrice);
+
+    // Create notification for admin
+    const admins = db.prepare('SELECT id FROM users WHERE role = ?').all('admin');
+    admins.forEach(admin => {
+      db.prepare(`
+        INSERT INTO notifications (userId, type, title, message)
+        VALUES (?, 'product_request', 'Nouvelle demande d''activation', ?)
+      `).run(admin.id, `${user.firstName} ${user.lastName} demande l'activation de "${product.name}"`);
+    });
 
     res.status(201).json({ 
-      message: 'Produit activé avec succès',
-      userProductId: result.lastInsertRowid
+      message: 'Demande envoyée ! En attente d\'approbation par l\'administrateur.',
+      userProductId: result.lastInsertRowid,
+      status: 'pending'
     });
   } catch (error) {
     console.error('Activate product error:', error);
@@ -236,19 +252,50 @@ router.post('/activate', authMiddleware, (req, res) => {
   }
 });
 
-// Get user's activated products
+// Get user's products (all statuses with subscription info)
 router.get('/my-products', authMiddleware, (req, res) => {
   try {
     const products = db.prepare(`
-      SELECT up.*, p.name, p.slug, p.description, p.icon, pc.name as categoryName, pc.color
+      SELECT up.*, p.name, p.slug, p.description, p.icon, p.price as unitPrice,
+             pc.name as categoryName, pc.color,
+             julianday(up.expiresAt) - julianday('now') as daysRemaining
       FROM user_products up
       JOIN products p ON up.productId = p.id
       JOIN product_categories pc ON p.categoryId = pc.id
-      WHERE up.userId = ? AND up.status = 'active'
-      ORDER BY up.activatedAt DESC
+      WHERE up.userId = ?
+      ORDER BY 
+        CASE up.status 
+          WHEN 'active' THEN 1 
+          WHEN 'pending' THEN 2 
+          WHEN 'expired' THEN 3 
+          ELSE 4 
+        END,
+        up.requestedAt DESC
     `).all(req.user.userId);
 
-    res.json({ products });
+    // Add computed fields
+    const enrichedProducts = products.map(p => ({
+      ...p,
+      daysRemaining: p.daysRemaining ? Math.max(0, Math.floor(p.daysRemaining)) : null,
+      isExpiringSoon: p.daysRemaining && p.daysRemaining <= 7 && p.daysRemaining > 0,
+      isExpired: p.status === 'active' && p.expiresAt && new Date(p.expiresAt) < new Date()
+    }));
+
+    // Separate by status
+    const active = enrichedProducts.filter(p => p.status === 'active' && !p.isExpired);
+    const pending = enrichedProducts.filter(p => p.status === 'pending');
+    const expired = enrichedProducts.filter(p => p.status === 'expired' || p.isExpired);
+    const rejected = enrichedProducts.filter(p => p.status === 'rejected');
+
+    res.json({ 
+      products: enrichedProducts,
+      summary: {
+        active: active.length,
+        pending: pending.length,
+        expired: expired.length,
+        rejected: rejected.length
+      }
+    });
   } catch (error) {
     console.error('Get my products error:', error);
     res.status(500).json({ message: 'Erreur serveur' });
@@ -272,6 +319,215 @@ router.delete('/deactivate/:userProductId', authMiddleware, (req, res) => {
     res.json({ message: 'Produit désactivé' });
   } catch (error) {
     console.error('Deactivate product error:', error);
+    res.status(500).json({ message: 'Erreur serveur' });
+  }
+});
+
+// Request renewal
+router.post('/renew/:userProductId', authMiddleware, (req, res) => {
+  try {
+    const { duration = 1 } = req.body;
+    const userProduct = db.prepare(`
+      SELECT up.*, p.price, p.name 
+      FROM user_products up
+      JOIN products p ON up.productId = p.id
+      WHERE up.id = ? AND up.userId = ?
+    `).get(req.params.userProductId, req.user.userId);
+
+    if (!userProduct) {
+      return res.status(404).json({ message: 'Abonnement non trouvé' });
+    }
+
+    const user = db.prepare('SELECT firstName, lastName FROM users WHERE id = ?').get(req.user.userId);
+    const totalPrice = userProduct.price * duration;
+
+    // Update to pending renewal
+    db.prepare(`
+      UPDATE user_products 
+      SET status = 'pending', duration = ?, price = ?, requestedAt = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).run(duration, totalPrice, req.params.userProductId);
+
+    // Notify admin
+    const admins = db.prepare('SELECT id FROM users WHERE role = ?').all('admin');
+    admins.forEach(admin => {
+      db.prepare(`
+        INSERT INTO notifications (userId, type, title, message)
+        VALUES (?, 'product_renewal', 'Demande de renouvellement', ?)
+      `).run(admin.id, `${user.firstName} ${user.lastName} demande le renouvellement de "${userProduct.name}"`);
+    });
+
+    res.json({ message: 'Demande de renouvellement envoyée' });
+  } catch (error) {
+    console.error('Renew product error:', error);
+    res.status(500).json({ message: 'Erreur serveur' });
+  }
+});
+
+// ============ ADMIN ROUTES ============
+
+// Get all pending product requests (admin)
+router.get('/admin/requests', authMiddleware, (req, res) => {
+  try {
+    // Check if admin
+    const user = db.prepare('SELECT role FROM users WHERE id = ?').get(req.user.userId);
+    if (user?.role !== 'admin') {
+      return res.status(403).json({ message: 'Accès non autorisé' });
+    }
+
+    const requests = db.prepare(`
+      SELECT up.*, 
+             p.name as productName, p.slug, p.price as unitPrice,
+             pc.name as categoryName, pc.color,
+             u.firstName, u.lastName, u.email, u.subscription as userPlan
+      FROM user_products up
+      JOIN products p ON up.productId = p.id
+      JOIN product_categories pc ON p.categoryId = pc.id
+      JOIN users u ON up.userId = u.id
+      WHERE up.status = 'pending'
+      ORDER BY up.requestedAt ASC
+    `).all();
+
+    res.json({ requests });
+  } catch (error) {
+    console.error('Get admin requests error:', error);
+    res.status(500).json({ message: 'Erreur serveur' });
+  }
+});
+
+// Get all product subscriptions (admin)
+router.get('/admin/subscriptions', authMiddleware, (req, res) => {
+  try {
+    // Check if admin
+    const user = db.prepare('SELECT role FROM users WHERE id = ?').get(req.user.userId);
+    if (user?.role !== 'admin') {
+      return res.status(403).json({ message: 'Accès non autorisé' });
+    }
+
+    const subscriptions = db.prepare(`
+      SELECT up.*, 
+             p.name as productName, p.slug, p.price as unitPrice,
+             pc.name as categoryName, pc.color,
+             u.firstName, u.lastName, u.email, u.subscription as userPlan,
+             julianday(up.expiresAt) - julianday('now') as daysRemaining
+      FROM user_products up
+      JOIN products p ON up.productId = p.id
+      JOIN product_categories pc ON p.categoryId = pc.id
+      JOIN users u ON up.userId = u.id
+      ORDER BY up.status, up.requestedAt DESC
+    `).all();
+
+    // Add computed fields
+    const enriched = subscriptions.map(s => ({
+      ...s,
+      daysRemaining: s.daysRemaining ? Math.max(0, Math.floor(s.daysRemaining)) : null,
+      isExpiringSoon: s.daysRemaining && s.daysRemaining <= 7 && s.daysRemaining > 0
+    }));
+
+    res.json({ subscriptions: enriched });
+  } catch (error) {
+    console.error('Get admin subscriptions error:', error);
+    res.status(500).json({ message: 'Erreur serveur' });
+  }
+});
+
+// Approve product request (admin)
+router.post('/admin/approve/:requestId', authMiddleware, (req, res) => {
+  try {
+    // Check if admin
+    const admin = db.prepare('SELECT role FROM users WHERE id = ?').get(req.user.userId);
+    if (admin?.role !== 'admin') {
+      return res.status(403).json({ message: 'Accès non autorisé' });
+    }
+
+    const request = db.prepare(`
+      SELECT up.*, p.name as productName, u.firstName, u.lastName
+      FROM user_products up
+      JOIN products p ON up.productId = p.id
+      JOIN users u ON up.userId = u.id
+      WHERE up.id = ? AND up.status = 'pending'
+    `).get(req.params.requestId);
+
+    if (!request) {
+      return res.status(404).json({ message: 'Demande non trouvée' });
+    }
+
+    // Calculate expiry date
+    const now = new Date();
+    let expiresAt = new Date(now);
+    if (request.durationUnit === 'month') {
+      expiresAt.setMonth(expiresAt.getMonth() + request.duration);
+    } else if (request.durationUnit === 'year') {
+      expiresAt.setFullYear(expiresAt.getFullYear() + request.duration);
+    } else {
+      expiresAt.setDate(expiresAt.getDate() + request.duration);
+    }
+
+    // Approve and activate
+    db.prepare(`
+      UPDATE user_products 
+      SET status = 'active', 
+          approvedAt = CURRENT_TIMESTAMP, 
+          approvedBy = ?,
+          activatedAt = CURRENT_TIMESTAMP,
+          expiresAt = ?
+      WHERE id = ?
+    `).run(req.user.userId, expiresAt.toISOString(), req.params.requestId);
+
+    // Notify user
+    db.prepare(`
+      INSERT INTO notifications (userId, type, title, message)
+      VALUES (?, 'product_approved', 'Offre activée !', ?)
+    `).run(request.userId, `Votre offre "${request.productName}" a été activée. Valide jusqu'au ${expiresAt.toLocaleDateString('fr-FR')}`);
+
+    res.json({ 
+      message: 'Offre approuvée et activée',
+      expiresAt: expiresAt.toISOString()
+    });
+  } catch (error) {
+    console.error('Approve request error:', error);
+    res.status(500).json({ message: 'Erreur serveur' });
+  }
+});
+
+// Reject product request (admin)
+router.post('/admin/reject/:requestId', authMiddleware, (req, res) => {
+  try {
+    const { reason } = req.body;
+    
+    // Check if admin
+    const admin = db.prepare('SELECT role FROM users WHERE id = ?').get(req.user.userId);
+    if (admin?.role !== 'admin') {
+      return res.status(403).json({ message: 'Accès non autorisé' });
+    }
+
+    const request = db.prepare(`
+      SELECT up.*, p.name as productName
+      FROM user_products up
+      JOIN products p ON up.productId = p.id
+      WHERE up.id = ? AND up.status = 'pending'
+    `).get(req.params.requestId);
+
+    if (!request) {
+      return res.status(404).json({ message: 'Demande non trouvée' });
+    }
+
+    // Reject
+    db.prepare(`
+      UPDATE user_products 
+      SET status = 'rejected', adminNote = ?
+      WHERE id = ?
+    `).run(reason || 'Demande refusée', req.params.requestId);
+
+    // Notify user
+    db.prepare(`
+      INSERT INTO notifications (userId, type, title, message)
+      VALUES (?, 'product_rejected', 'Demande refusée', ?)
+    `).run(request.userId, `Votre demande pour "${request.productName}" a été refusée. ${reason || ''}`);
+
+    res.json({ message: 'Demande refusée' });
+  } catch (error) {
+    console.error('Reject request error:', error);
     res.status(500).json({ message: 'Erreur serveur' });
   }
 });

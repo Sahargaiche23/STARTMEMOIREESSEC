@@ -231,12 +231,21 @@ db.exec(`
     userId INTEGER NOT NULL,
     productId INTEGER NOT NULL,
     projectId INTEGER,
-    status TEXT DEFAULT 'active',
-    activatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+    status TEXT DEFAULT 'pending',
+    duration INTEGER DEFAULT 1,
+    durationUnit TEXT DEFAULT 'month',
+    price REAL DEFAULT 0,
+    requestedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+    approvedAt DATETIME,
+    approvedBy INTEGER,
+    activatedAt DATETIME,
     expiresAt DATETIME,
+    renewalReminder INTEGER DEFAULT 0,
+    adminNote TEXT,
     FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE,
     FOREIGN KEY (productId) REFERENCES products(id) ON DELETE CASCADE,
     FOREIGN KEY (projectId) REFERENCES projects(id) ON DELETE SET NULL,
+    FOREIGN KEY (approvedBy) REFERENCES users(id) ON DELETE SET NULL,
     UNIQUE(userId, productId, projectId)
   );
 `);

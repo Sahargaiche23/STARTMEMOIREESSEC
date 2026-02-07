@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { 
   Shield, Users, FolderKanban, CreditCard, BarChart3, 
-  Settings, LogOut, Home
+  Settings, LogOut, Home, Package
 } from 'lucide-react';
 import useAuthStore from '../store/authStore';
 
@@ -49,6 +49,7 @@ const AdminLayout = ({ children }) => {
     { path: '/admin', icon: BarChart3, label: 'Tableau de bord' },
     { path: '/admin/users', icon: Users, label: 'Utilisateurs' },
     { path: '/admin/projects', icon: FolderKanban, label: 'Projets' },
+    { path: '/admin/products', icon: Package, label: 'Offres & Produits' },
     { path: '/admin/payments', icon: CreditCard, label: 'Paiements' },
   ];
 

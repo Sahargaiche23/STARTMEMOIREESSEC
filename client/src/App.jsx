@@ -18,6 +18,7 @@ import TaskManager from './pages/TaskManager';
 import TeamMembers from './pages/TeamMembers';
 import InviteRegister from './pages/InviteRegister';
 import ProductsSolutions from './pages/ProductsSolutions';
+import MySubscriptions from './pages/MySubscriptions';
 import Pricing from './pages/Pricing';
 import Profile from './pages/Profile';
 import GoogleCallback from './pages/GoogleCallback';
@@ -28,6 +29,7 @@ import AdminDashboard from './pages/admin/AdminDashboard';
 import AdminUsers from './pages/admin/AdminUsers';
 import AdminPayments from './pages/admin/AdminPayments';
 import AdminProjects from './pages/admin/AdminProjects';
+import AdminProducts from './pages/admin/AdminProducts';
 
 const ProtectedRoute = ({ children }) => {
   const { isAuthenticated } = useAuthStore();
@@ -190,6 +192,13 @@ function App() {
             </Layout>
           </ProtectedRoute>
         } />
+        <Route path="/mes-offres" element={
+          <ProtectedRoute>
+            <Layout>
+              <MySubscriptions />
+            </Layout>
+          </ProtectedRoute>
+        } />
         
         {/* Admin Routes */}
         <Route path="/admin/login" element={<AdminLogin />} />
@@ -211,6 +220,11 @@ function App() {
         <Route path="/admin/projects" element={
           <AdminLayout>
             <AdminProjects />
+          </AdminLayout>
+        } />
+        <Route path="/admin/products" element={
+          <AdminLayout>
+            <AdminProducts />
           </AdminLayout>
         } />
       </Routes>

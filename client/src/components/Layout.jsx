@@ -27,7 +27,7 @@ const Layout = ({ children }) => {
     { name: 'Mes Projets', href: '/projects', icon: FolderOpen },
     { name: 'Générateur d\'idées', href: '/ideas', icon: Lightbulb },
     { name: 'Produits & Solutions', href: '/entreprise/produits-solutions', icon: Package },
-    { name: 'Abonnement', href: '/pricing', icon: CreditCard },
+    { name: 'Mes Offres', href: '/mes-offres', icon: CreditCard },
     { name: 'Mon Profil', href: '/profile', icon: User },
   ];
 
