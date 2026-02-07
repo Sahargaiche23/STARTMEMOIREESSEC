@@ -165,7 +165,7 @@ router.get('/users', authMiddleware, isAdmin, (req, res) => {
 router.get('/users/:id', authMiddleware, isAdmin, (req, res) => {
   try {
     const user = db.prepare(`
-      SELECT u.*, s.plan as subscriptionPlan, s.startDate, s.endDate
+      SELECT u.*, s.plan as subscriptionPlan, s.startDate, s.endDate, s.isActive as subscriptionActive
       FROM users u
       LEFT JOIN subscriptions s ON u.id = s.userId
       WHERE u.id = ?
@@ -181,10 +181,80 @@ router.get('/users/:id', authMiddleware, isAdmin, (req, res) => {
     // Get user's payments
     const payments = db.prepare('SELECT * FROM payments WHERE userId = ? ORDER BY createdAt DESC').all(req.params.id);
     
+    // Get user's product subscriptions (offers)
+    const userProducts = db.prepare(`
+      SELECT up.*, p.name as productName, p.slug, p.price, p.categoryId
+      FROM user_products up
+      JOIN products p ON up.productId = p.id
+      WHERE up.userId = ?
+      ORDER BY up.requestedAt DESC
+    `).all(req.params.id);
+    
+    // Get user's ideas
+    const ideas = db.prepare('SELECT * FROM ideas WHERE userId = ? ORDER BY createdAt DESC LIMIT 10').all(req.params.id);
+    
+    // Get user's accounting transactions
+    let transactions = [];
+    try {
+      transactions = db.prepare(`
+        SELECT * FROM accounting_transactions WHERE userId = ? ORDER BY date DESC LIMIT 10
+      `).all(req.params.id);
+    } catch (e) {
+      // Table might not exist
+    }
+    
+    // Get user activity log (login history, etc.)
+    const activityLog = [];
+    
+    // Add registration event
+    activityLog.push({
+      type: 'registration',
+      description: 'Inscription sur la plateforme',
+      date: user.createdAt
+    });
+    
+    // Add project creation events
+    projects.forEach(p => {
+      activityLog.push({
+        type: 'project',
+        description: `Création du projet: ${p.name}`,
+        date: p.createdAt
+      });
+    });
+    
+    // Add payment events
+    payments.forEach(p => {
+      activityLog.push({
+        type: 'payment',
+        description: `Paiement de ${p.amount} ${p.currency} - ${p.status}`,
+        date: p.createdAt
+      });
+    });
+    
+    // Add product activation events
+    userProducts.forEach(up => {
+      activityLog.push({
+        type: 'product',
+        description: `Activation offre: ${up.productName} - ${up.status}`,
+        date: up.requestedAt || up.activatedAt
+      });
+    });
+    
+    // Sort activity log by date
+    activityLog.sort((a, b) => new Date(b.date) - new Date(a.date));
+    
     delete user.password;
     delete user.faceDescriptor;
     
-    res.json({ user, projects, payments });
+    res.json({ 
+      user, 
+      projects, 
+      payments, 
+      userProducts,
+      ideas,
+      transactions,
+      activityLog
+    });
   } catch (error) {
     console.error('Get user error:', error);
     res.status(500).json({ message: 'Erreur serveur' });
@@ -289,8 +359,25 @@ router.get('/payments', authMiddleware, isAdmin, (req, res) => {
     
     const payments = db.prepare(query).all(...params);
     
+    // Calculate stats for ALL payments (not just current page)
+    const stats = {
+      totalRevenue: db.prepare(`
+        SELECT COALESCE(SUM(amount), 0) as total FROM payments WHERE status = 'completed'
+      `).get().total,
+      completed: db.prepare(`
+        SELECT COUNT(*) as count FROM payments WHERE status = 'completed'
+      `).get().count,
+      pending: db.prepare(`
+        SELECT COUNT(*) as count FROM payments WHERE status = 'pending'
+      `).get().count,
+      rejected: db.prepare(`
+        SELECT COUNT(*) as count FROM payments WHERE status = 'rejected'
+      `).get().count
+    };
+
     res.json({
       payments,
+      stats,
       pagination: {
         page: parseInt(page),
         limit: parseInt(limit),
@@ -308,9 +395,14 @@ router.get('/payments', authMiddleware, isAdmin, (req, res) => {
 router.put('/payments/:id/status', authMiddleware, isAdmin, (req, res) => {
   try {
     const { id } = req.params;
-    const { status } = req.body; // 'approved' or 'rejected'
+    let { status } = req.body; // 'approved' or 'rejected' or 'completed'
     
-    if (!['approved', 'rejected', 'pending'].includes(status)) {
+    // Map 'approved' to 'completed' for consistency
+    if (status === 'approved') {
+      status = 'completed';
+    }
+    
+    if (!['completed', 'rejected', 'pending'].includes(status)) {
       return res.status(400).json({ message: 'Statut invalide' });
     }
     
@@ -322,16 +414,16 @@ router.put('/payments/:id/status', authMiddleware, isAdmin, (req, res) => {
     // Update payment status
     db.prepare('UPDATE payments SET status = ? WHERE id = ?').run(status, id);
     
-    // If approved, activate the subscription
-    if (status === 'approved') {
+    // If completed, activate the subscription
+    if (status === 'completed') {
       const subscription = db.prepare('SELECT * FROM subscriptions WHERE userId = ?').get(payment.userId);
       if (subscription) {
-        db.prepare('UPDATE subscriptions SET isActive = 1, paymentStatus = ? WHERE userId = ?').run('approved', payment.userId);
+        db.prepare('UPDATE subscriptions SET isActive = 1, paymentStatus = ? WHERE userId = ?').run('completed', payment.userId);
       } else {
         // Create subscription if doesn't exist
         db.prepare(`
           INSERT INTO subscriptions (userId, plan, isActive, paymentStatus, startDate)
-          VALUES (?, ?, 1, 'approved', datetime('now'))
+          VALUES (?, ?, 1, 'completed', datetime('now'))
         `).run(payment.userId, payment.subscriptionType || 'pro');
       }
       
@@ -355,7 +447,7 @@ router.put('/payments/:id/status', authMiddleware, isAdmin, (req, res) => {
       `).run(payment.userId);
     }
     
-    res.json({ message: `Paiement ${status === 'approved' ? 'approuvé' : 'rejeté'}` });
+    res.json({ message: `Paiement ${status === 'completed' ? 'approuvé' : 'rejeté'}` });
   } catch (error) {
     console.error('Update payment status error:', error);
     res.status(500).json({ message: 'Erreur serveur' });

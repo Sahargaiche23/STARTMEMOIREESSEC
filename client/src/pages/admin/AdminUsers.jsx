@@ -403,6 +403,31 @@ const AdminUsers = () => {
                 </div>
               </div>
 
+              {/* User Products / Offers */}
+              <div>
+                <h4 className="font-semibold mb-2">Offres activées ({selectedUser.userProducts?.length || 0})</h4>
+                <div className="space-y-2 max-h-32 overflow-y-auto">
+                  {selectedUser.userProducts?.map((product) => (
+                    <div key={product.id} className="p-2 bg-blue-50 rounded-lg text-sm flex justify-between items-center">
+                      <div>
+                        <span className="font-medium">{product.productName}</span>
+                        <span className="text-gray-500 ml-2">({product.price} TND/mois)</span>
+                      </div>
+                      <span className={`px-2 py-0.5 rounded text-xs ${
+                        product.status === 'active' ? 'bg-green-100 text-green-700' :
+                        product.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
+                        'bg-red-100 text-red-700'
+                      }`}>
+                        {product.status}
+                      </span>
+                    </div>
+                  ))}
+                  {(!selectedUser.userProducts || selectedUser.userProducts.length === 0) && (
+                    <p className="text-gray-500 text-sm">Aucune offre activée</p>
+                  )}
+                </div>
+              </div>
+
               {/* Payments */}
               <div>
                 <h4 className="font-semibold mb-2">Paiements ({selectedUser.payments?.length || 0})</h4>
@@ -410,13 +435,50 @@ const AdminUsers = () => {
                   {selectedUser.payments?.map((payment) => (
                     <div key={payment.id} className="p-2 bg-gray-50 rounded-lg text-sm flex justify-between">
                       <span>{payment.amount} {payment.currency}</span>
-                      <span className={payment.status === 'completed' ? 'text-green-600' : 'text-yellow-600'}>
-                        {payment.status}
+                      <span className={`px-2 py-0.5 rounded text-xs ${
+                        payment.status === 'completed' ? 'bg-green-100 text-green-700' :
+                        payment.status === 'rejected' ? 'bg-red-100 text-red-700' :
+                        'bg-yellow-100 text-yellow-700'
+                      }`}>
+                        {payment.status === 'completed' ? 'complété' : payment.status === 'rejected' ? 'rejeté' : payment.status}
                       </span>
                     </div>
                   ))}
                   {(!selectedUser.payments || selectedUser.payments.length === 0) && (
                     <p className="text-gray-500 text-sm">Aucun paiement</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Activity Log */}
+              <div>
+                <h4 className="font-semibold mb-2">Historique d'activité</h4>
+                <div className="space-y-2 max-h-48 overflow-y-auto">
+                  {selectedUser.activityLog?.map((activity, index) => (
+                    <div key={index} className="p-2 bg-gray-50 rounded-lg text-sm flex items-center gap-3">
+                      <span className={`w-2 h-2 rounded-full ${
+                        activity.type === 'registration' ? 'bg-blue-500' :
+                        activity.type === 'project' ? 'bg-purple-500' :
+                        activity.type === 'payment' ? 'bg-green-500' :
+                        activity.type === 'product' ? 'bg-orange-500' :
+                        'bg-gray-500'
+                      }`} />
+                      <div className="flex-1">
+                        <p className="text-gray-700">{activity.description}</p>
+                        <p className="text-xs text-gray-400">
+                          {new Date(activity.date).toLocaleDateString('fr-FR', {
+                            day: 'numeric',
+                            month: 'short',
+                            year: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                  {(!selectedUser.activityLog || selectedUser.activityLog.length === 0) && (
+                    <p className="text-gray-500 text-sm">Aucune activité</p>
                   )}
                 </div>
               </div>

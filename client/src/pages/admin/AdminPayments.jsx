@@ -29,13 +29,14 @@ const AdminPayments = () => {
       setPayments(res.data.payments);
       setPagination(res.data.pagination);
       
-      // Calculate stats
-      const allPayments = res.data.payments;
-      setStats({
-        total: allPayments.reduce((sum, p) => sum + (p.status === 'completed' ? p.amount : 0), 0),
-        completed: allPayments.filter(p => p.status === 'completed').length,
-        pending: allPayments.filter(p => p.status === 'pending').length
-      });
+      // Use stats from backend (calculated on ALL payments)
+      if (res.data.stats) {
+        setStats({
+          total: res.data.stats.totalRevenue,
+          completed: res.data.stats.completed,
+          pending: res.data.stats.pending
+        });
+      }
     } catch (error) {
       toast.error('Erreur lors du chargement des paiements');
     } finally {
