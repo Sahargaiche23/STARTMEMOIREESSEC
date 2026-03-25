@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { 
   TrendingUp, TrendingDown, DollarSign, PieChart,
   Plus, Download, Calendar, ArrowUpRight, ArrowDownRight,
-  FileText, Calculator, Receipt, BarChart3
+  FileText, Calculator, Receipt, BarChart3, Edit2, Trash2
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../../utils/api';
@@ -14,6 +14,7 @@ const AccountingDashboard = () => {
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
+  const [editingTransaction, setEditingTransaction] = useState(null);
   const [activeProducts, setActiveProducts] = useState([]);
   const [newTransaction, setNewTransaction] = useState({
     type: 'revenue',
@@ -107,12 +108,21 @@ const AccountingDashboard = () => {
   const handleAddTransaction = async (e) => {
     e.preventDefault();
     try {
-      await api.post('/accounting/transactions', {
-        ...newTransaction,
-        amount: parseFloat(newTransaction.amount)
-      });
-      toast.success('Transaction ajoutée !');
+      if (editingTransaction) {
+        await api.put(`/accounting/transactions/${editingTransaction.id}`, {
+          ...newTransaction,
+          amount: parseFloat(newTransaction.amount)
+        });
+        toast.success('Transaction mise à jour !');
+      } else {
+        await api.post('/accounting/transactions', {
+          ...newTransaction,
+          amount: parseFloat(newTransaction.amount)
+        });
+        toast.success('Transaction ajoutée !');
+      }
       setShowAddModal(false);
+      setEditingTransaction(null);
       setNewTransaction({
         type: 'revenue',
         category: '',
@@ -125,6 +135,31 @@ const AccountingDashboard = () => {
       fetchSummary();
     } catch (error) {
       toast.error(error.response?.data?.message || 'Erreur');
+    }
+  };
+
+  const handleEditTransaction = (transaction) => {
+    setEditingTransaction(transaction);
+    setNewTransaction({
+      type: transaction.type,
+      category: transaction.category,
+      description: transaction.description || '',
+      amount: transaction.amount.toString(),
+      date: transaction.date,
+      paymentMethod: transaction.paymentMethod || 'virement',
+      reference: transaction.reference || ''
+    });
+    setShowAddModal(true);
+  };
+
+  const handleDeleteTransaction = async (id) => {
+    if (!confirm('Supprimer cette transaction ?')) return;
+    try {
+      await api.delete(`/accounting/transactions/${id}`);
+      toast.success('Transaction supprimée');
+      fetchSummary();
+    } catch (error) {
+      toast.error('Erreur lors de la suppression');
     }
   };
 
@@ -178,7 +213,7 @@ const AccountingDashboard = () => {
             ))}
           </select>
           <button
-            onClick={() => setShowAddModal(true)}
+            onClick={() => { setEditingTransaction(null); setNewTransaction({ type: 'revenue', category: '', description: '', amount: '', date: new Date().toISOString().split('T')[0], paymentMethod: 'virement', reference: '' }); setShowAddModal(true); }}
             className="btn-primary flex items-center gap-2"
           >
             <Plus className="w-5 h-5" />
@@ -358,7 +393,7 @@ const AccountingDashboard = () => {
           </div>
           <div className="space-y-3">
             {summary?.recentTransactions?.map((transaction) => (
-              <div key={transaction.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+              <div key={transaction.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg group">
                 <div className="flex items-center gap-3">
                   <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
                     transaction.type === 'revenue' ? 'bg-green-100' : 'bg-red-100'
@@ -374,11 +409,29 @@ const AccountingDashboard = () => {
                     <p className="text-sm text-gray-500">{formatDate(transaction.date)}</p>
                   </div>
                 </div>
-                <span className={`font-semibold ${
-                  transaction.type === 'revenue' ? 'text-green-600' : 'text-red-600'
-                }`}>
-                  {transaction.type === 'revenue' ? '+' : '-'}{formatCurrency(transaction.amount)}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className={`font-semibold ${
+                    transaction.type === 'revenue' ? 'text-green-600' : 'text-red-600'
+                  }`}>
+                    {transaction.type === 'revenue' ? '+' : '-'}{formatCurrency(transaction.amount)}
+                  </span>
+                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button
+                      onClick={() => handleEditTransaction(transaction)}
+                      className="p-1.5 hover:bg-blue-100 rounded-lg text-gray-400 hover:text-blue-600"
+                      title="Modifier"
+                    >
+                      <Edit2 className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => handleDeleteTransaction(transaction.id)}
+                      className="p-1.5 hover:bg-red-100 rounded-lg text-gray-400 hover:text-red-600"
+                      title="Supprimer"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
               </div>
             ))}
             {(!summary?.recentTransactions || summary.recentTransactions.length === 0) && (
@@ -423,7 +476,9 @@ const AccountingDashboard = () => {
       {showAddModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full p-6 max-h-[90vh] overflow-y-auto">
-            <h3 className="text-xl font-semibold text-gray-900 mb-4">Nouvelle transaction</h3>
+            <h3 className="text-xl font-semibold text-gray-900 mb-4">
+              {editingTransaction ? 'Modifier la transaction' : 'Nouvelle transaction'}
+            </h3>
             <form onSubmit={handleAddTransaction} className="space-y-4">
               {/* Type */}
               <div className="flex gap-2">
@@ -546,7 +601,7 @@ const AccountingDashboard = () => {
               <div className="flex gap-3 pt-4">
                 <button
                   type="button"
-                  onClick={() => setShowAddModal(false)}
+                  onClick={() => { setShowAddModal(false); setEditingTransaction(null); }}
                   className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 font-medium"
                 >
                   Annuler
@@ -555,7 +610,7 @@ const AccountingDashboard = () => {
                   type="submit"
                   className="flex-1 btn-primary"
                 >
-                  Ajouter
+                  {editingTransaction ? 'Modifier' : 'Ajouter'}
                 </button>
               </div>
             </form>

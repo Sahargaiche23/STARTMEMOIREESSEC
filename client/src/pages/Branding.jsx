@@ -98,9 +98,16 @@ const Branding = () => {
   };
 
   const handleSave = async () => {
+    if (!branding.companyName?.trim()) {
+      toast.error('Entrez d\'abord un nom d\'entreprise');
+      return;
+    }
     setSaving(true);
     try {
-      await api.post(`/branding/project/${projectId}`, branding);
+      const res = await api.post(`/branding/project/${projectId}`, branding);
+      if (res.data.branding) {
+        setBranding(res.data.branding);
+      }
       toast.success('Branding sauvegardé');
     } catch (error) {
       toast.error('Erreur lors de la sauvegarde');
@@ -530,11 +537,20 @@ const Branding = () => {
             fontFamily: branding.fontFamily
           }}
         >
-          <div 
-            className="w-20 h-20 mx-auto mb-4 rounded-2xl flex items-center justify-center text-white font-bold text-3xl"
-            style={{ backgroundColor: branding.primaryColor }}
-          >
-            {branding.companyName?.substring(0, 2).toUpperCase() || 'SU'}
+          <div className="w-20 h-20 mx-auto mb-4">
+            {branding.logoStyle ? (
+              renderLogoPreview(
+                { ...branding.logoStyle, colors: { primary: branding.primaryColor, secondary: branding.secondaryColor } },
+                branding.companyName
+              )
+            ) : (
+              <div 
+                className="w-20 h-20 rounded-2xl flex items-center justify-center text-white font-bold text-3xl"
+                style={{ backgroundColor: branding.primaryColor }}
+              >
+                {branding.companyName?.substring(0, 2).toUpperCase() || 'SU'}
+              </div>
+            )}
           </div>
           <h3 className="text-3xl font-bold mb-2" style={{ color: branding.primaryColor }}>
             {branding.companyName || 'Nom de votre startup'}

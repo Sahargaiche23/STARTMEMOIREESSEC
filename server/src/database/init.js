@@ -85,6 +85,7 @@ db.exec(`
     companyName TEXT,
     slogan TEXT,
     logoUrl TEXT,
+    logoStyle TEXT,
     primaryColor TEXT,
     secondaryColor TEXT,
     fontFamily TEXT,

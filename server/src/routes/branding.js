@@ -196,6 +196,10 @@ router.get('/project/:projectId', authMiddleware, (req, res) => {
     const branding = db.prepare('SELECT * FROM branding WHERE projectId = ?')
       .get(req.params.projectId);
 
+    if (branding && branding.logoStyle) {
+      try { branding.logoStyle = JSON.parse(branding.logoStyle); } catch(e) {}
+    }
+
     res.json({ branding: branding || null });
   } catch (error) {
     console.error('Get branding error:', error);
@@ -211,7 +215,8 @@ router.post('/project/:projectId', authMiddleware, (req, res) => {
       return res.status(404).json({ message: 'Projet non trouvé' });
     }
 
-    const { companyName, slogan, logoUrl, primaryColor, secondaryColor, fontFamily, brandVoice } = req.body;
+    const { companyName, slogan, logoUrl, logoStyle, primaryColor, secondaryColor, fontFamily, brandVoice } = req.body;
+    const logoStyleStr = logoStyle ? JSON.stringify(logoStyle) : null;
 
     const existing = db.prepare('SELECT id FROM branding WHERE projectId = ?')
       .get(req.params.projectId);
@@ -219,30 +224,34 @@ router.post('/project/:projectId', authMiddleware, (req, res) => {
     if (existing) {
       db.prepare(`
         UPDATE branding SET
-          companyName = ?, slogan = ?, logoUrl = ?,
+          companyName = ?, slogan = ?, logoUrl = ?, logoStyle = ?,
           primaryColor = ?, secondaryColor = ?, fontFamily = ?,
           brandVoice = ?, updatedAt = CURRENT_TIMESTAMP
         WHERE projectId = ?
       `).run(
-        companyName, slogan, logoUrl,
+        companyName, slogan, logoUrl, logoStyleStr,
         primaryColor, secondaryColor, fontFamily,
         brandVoice, req.params.projectId
       );
     } else {
       db.prepare(`
-        INSERT INTO branding (projectId, companyName, slogan, logoUrl, primaryColor, secondaryColor, fontFamily, brandVoice)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO branding (projectId, companyName, slogan, logoUrl, logoStyle, primaryColor, secondaryColor, fontFamily, brandVoice)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
         req.params.projectId,
-        companyName, slogan, logoUrl,
+        companyName, slogan, logoUrl, logoStyleStr,
         primaryColor, secondaryColor, fontFamily, brandVoice
       );
     }
 
-    const branding = db.prepare('SELECT * FROM branding WHERE projectId = ?')
+    const savedBranding = db.prepare('SELECT * FROM branding WHERE projectId = ?')
       .get(req.params.projectId);
 
-    res.json({ message: 'Branding sauvegardé', branding });
+    if (savedBranding && savedBranding.logoStyle) {
+      try { savedBranding.logoStyle = JSON.parse(savedBranding.logoStyle); } catch(e) {}
+    }
+
+    res.json({ message: 'Branding sauvegardé', branding: savedBranding });
   } catch (error) {
     console.error('Save branding error:', error);
     res.status(500).json({ message: 'Erreur serveur' });
