@@ -5,7 +5,7 @@
 
 [[redirects]]
   from = "/api/*"
-  to = "http://localhost:5000/api/:splat"
+  to = "https://startuplab-api.onrender.com/api/:splat"
   status = 200
   force = true
 
