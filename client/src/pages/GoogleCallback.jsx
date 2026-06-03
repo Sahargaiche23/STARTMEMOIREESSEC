@@ -40,7 +40,8 @@ const GoogleCallback = () => {
       navigate('/dashboard');
     } catch (error) {
       console.error('Google callback error:', error);
-      toast.error('Erreur de connexion Google');
+      console.error('Error details:', error.response?.data);
+      toast.error(error.response?.data?.description || error.response?.data?.message || 'Erreur de connexion Google');
       navigate('/login');
     }
   };

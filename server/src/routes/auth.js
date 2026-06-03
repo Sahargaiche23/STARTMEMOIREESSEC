@@ -226,7 +226,7 @@ router.post('/google/callback', async (req, res) => {
     
     if (tokens.error) {
       console.error('Token error:', tokens);
-      return res.status(401).json({ message: 'Erreur d\'authentification Google' });
+      return res.status(401).json({ message: 'Erreur d\'authentification Google', detail: tokens.error, description: tokens.error_description });
     }
     
     // Get user info from Google
