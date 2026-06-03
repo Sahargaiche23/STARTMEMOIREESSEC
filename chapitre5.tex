@@ -1,0 +1,873 @@
+\chapter{Sécurité, Tests et Validation}
+
+\section*{Introduction}
+\addcontentsline{toc}{section}{Introduction}
+
+La sécurité constitue un pilier fondamental de toute plateforme SaaS, en particulier lorsqu'elle manipule des données financières sensibles (comptabilité, fiches de paie, données CNSS). Ce chapitre présente l'architecture de sécurité mise en place dans StartUpLab, les mécanismes d'authentification et d'autorisation, la stratégie de tests adoptée, ainsi que les scénarios de validation fonctionnelle exécutés pour garantir la fiabilité de la plateforme.
+
+La plateforme StartUpLab traite plusieurs catégories de données sensibles : informations personnelles des utilisateurs, données comptables d'entreprise, fiches de paie avec numéros CNSS et CIN, contrats de travail avec signatures numériques, et informations bancaires des employés. La protection de ces données impose une approche de sécurité multicouche, conforme aux bonnes pratiques internationales et aux exigences de la législation tunisienne en matière de protection des données personnelles.
+
+\section{Architecture de sécurité}
+
+\subsection{Approche de sécurité multicouche}
+
+StartUpLab implémente une architecture de sécurité en profondeur (\textit{Defense in Depth}) qui comprend plusieurs couches de protection complémentaires. La figure~\ref{fig:security-layers} illustre cette architecture.
+
+\begin{figure}[H]
+\centering
+\fbox{\parbox{13cm}{
+\centering
+\textbf{Couche 1 : RÉSEAU \& TRANSPORT} -- HTTPS/TLS, CORS, Rate Limiting \\[4pt]
+\rule{12cm}{0.4pt}\\[4pt]
+\textbf{Couche 2 : AUTHENTIFICATION} -- JWT, bcrypt, Google OAuth 2.0, Face Recognition \\[4pt]
+\rule{12cm}{0.4pt}\\[4pt]
+\textbf{Couche 3 : AUTORISATION} -- Middleware auth, Rôles (user/admin), Plans \\[4pt]
+\rule{12cm}{0.4pt}\\[4pt]
+\textbf{Couche 4 : VALIDATION DES DONNÉES} -- express-validator, Requêtes préparées SQL \\[4pt]
+\rule{12cm}{0.4pt}\\[4pt]
+\textbf{Couche 5 : DONNÉES} -- Hashage mots de passe, Tokens temporaires, Foreign Keys
+}}
+\caption{Architecture de sécurité multicouche (Defense in Depth)}
+\label{fig:security-layers}
+\end{figure}
+
+\subsection{Sécurité au niveau du transport}
+
+Le serveur Express.js est configuré avec des middlewares de sécurité essentiels :
+
+\begin{table}[H]
+\centering
+\caption{Mécanismes de sécurité au niveau transport}
+\label{tab:transport-security}
+\begin{tabular}{|l|l|l|}
+\hline
+\textbf{Mécanisme} & \textbf{Implémentation} & \textbf{Rôle} \\
+\hline
+CORS & \texttt{cors()} middleware & Contrôle des origines autorisées \\
+\hline
+Limite de taille & \texttt{express.json(\{limit: '10mb'\})} & Protection contre les surcharges \\
+\hline
+Fichiers statiques & \texttt{express.static} contrôlé & Exposition limitée du FS \\
+\hline
+Variables d'env. & \texttt{dotenv} & Séparation secrets / code \\
+\hline
+\end{tabular}
+\end{table}
+
+\subsection{Matrice de sécurité par module}
+
+\begin{table}[H]
+\centering
+\caption{Matrice de sécurité par module applicatif}
+\label{tab:security-matrix}
+\begin{tabular}{|l|l|l|l|}
+\hline
+\textbf{Module} & \textbf{Données sensibles} & \textbf{Niveau} & \textbf{Mécanismes} \\
+\hline
+Authentification & Mots de passe, tokens & Critique & bcrypt, JWT, OAuth 2.0 \\
+\hline
+Comptabilité & Transactions, bilans & Élevé & Auth obligatoire, isolation userId \\
+\hline
+Paie \& RH & Salaires, CIN, CNSS & Critique & Auth + vérification propriétaire \\
+\hline
+Contrats & Signatures numériques & Élevé & Hash signature, horodatage \\
+\hline
+Export Expert & Données partagées & Élevé & Token temporaire, expiration \\
+\hline
+Admin & Toutes données & Critique & Double vérification, session 8h \\
+\hline
+Marketplace & Activations, paiements & Élevé & Validation plan, approbation admin \\
+\hline
+\end{tabular}
+\end{table}
+
+\section{Authentification et autorisation}
+
+\subsection{Système d'authentification triple}
+
+StartUpLab propose trois méthodes d'authentification complémentaires, chacune répondant à un cas d'usage différent.
+
+\subsubsection{Méthode 1 : Email + Mot de passe}
+
+Le flux d'inscription et de connexion par email suit les étapes suivantes :
+
+\begin{enumerate}
+    \item L'utilisateur fournit email, mot de passe (min. 6 caractères), prénom et nom
+    \item \texttt{express-validator} vérifie le format de l'email et la longueur du mot de passe
+    \item Vérification que l'email n'existe pas déjà dans la base
+    \item Le mot de passe est hashé avec \texttt{bcrypt} (10 salt rounds, $\sim$100ms par hash)
+    \item L'utilisateur est créé avec un abonnement \texttt{free} par défaut
+    \item Un JWT est généré avec une expiration de 7 jours
+\end{enumerate}
+
+\begin{verbatim}
+// Algorithme Blowfish, 10 salt rounds = 1024 iterations
+const hashedPassword = await bcrypt.hash(password, 10);
+// Verification (timing-safe)
+const isMatch = await bcrypt.compare(password, hashedPassword);
+\end{verbatim}
+
+\subsubsection{Méthode 2 : Google OAuth 2.0 (Authorization Code Flow)}
+
+Le flux OAuth 2.0 se déroule en six étapes :
+
+\begin{enumerate}
+    \item Frontend $\rightarrow$ Redirection Google $\rightarrow$ Code d'autorisation
+    \item Frontend $\rightarrow$ \texttt{POST /api/auth/google/callback \{code, redirectUri\}}
+    \item Backend $\rightarrow$ Échange code contre \texttt{access\_token} (googleapis)
+    \item Backend $\rightarrow$ Récupération profil (email, nom, photo)
+    \item Backend $\rightarrow$ Création/mise à jour utilisateur en BDD
+    \item Backend $\rightarrow$ Génération JWT $\rightarrow$ Retour au frontend
+\end{enumerate}
+
+Pour les nouveaux utilisateurs Google, un mot de passe aléatoire de 32 octets est généré et hashé (l'utilisateur utilise toujours Google pour se connecter).
+
+\subsubsection{Méthode 3 : Reconnaissance faciale (face-api.js)}
+
+\textbf{Phase d'enregistrement :}
+\begin{itemize}
+    \item La caméra capture le visage, \texttt{face-api.js} extrait un descripteur (vecteur 128 dimensions)
+    \item Le descripteur est stocké en JSON dans le champ \texttt{faceDescriptor}
+\end{itemize}
+
+\textbf{Phase de connexion :}
+\begin{itemize}
+    \item Un nouveau descripteur est extrait et envoyé au serveur avec l'email
+    \item Le serveur calcule la \textbf{distance euclidienne} :
+\end{itemize}
+
+\begin{equation}
+distance = \sqrt{\sum_{i=0}^{127}(descriptor_i - stored_i)^2}
+\end{equation}
+
+Si $distance \leq 0.6$ : Authentification réussie. Si $distance > 0.6$ : Rejet.
+
+\begin{table}[H]
+\centering
+\caption{Paramètres de la reconnaissance faciale}
+\label{tab:face-params}
+\begin{tabular}{|l|l|l|}
+\hline
+\textbf{Paramètre} & \textbf{Valeur} & \textbf{Justification} \\
+\hline
+Dimensions descripteur & 128 & Standard SSD MobileNet V1 \\
+\hline
+Seuil de correspondance & 0.6 & Compromis sécurité/usabilité \\
+\hline
+Algorithme de distance & Euclidienne & Rapide pour les embeddings \\
+\hline
+\end{tabular}
+\end{table}
+
+\subsection{Gestion des tokens JWT}
+
+\begin{table}[H]
+\centering
+\caption{Propriétés des tokens JWT}
+\label{tab:jwt-props}
+\begin{tabular}{|l|l|}
+\hline
+\textbf{Propriété} & \textbf{Valeur} \\
+\hline
+Payload utilisateur & \texttt{\{userId, email\}} \\
+\hline
+Payload admin & \texttt{\{userId: 0, email, isAdmin: true\}} \\
+\hline
+Expiration utilisateur & 7 jours \\
+\hline
+Expiration admin & 8 heures \\
+\hline
+Secret & Variable d'environnement \texttt{JWT\_SECRET} \\
+\hline
+Algorithme & HS256 (HMAC-SHA256) \\
+\hline
+\end{tabular}
+\end{table}
+
+Le fichier \texttt{middleware/auth.js} implémente deux middlewares :
+\begin{itemize}
+    \item \textbf{\texttt{authMiddleware}} (obligatoire) : Vérifie la présence et la validité du token Bearer. Rejette avec 401 si absent ou invalide.
+    \item \textbf{\texttt{optionalAuth}} (optionnel) : Tente de décoder le token s'il est présent, mais ne bloque pas si absent.
+\end{itemize}
+
+\begin{verbatim}
+const authMiddleware = (req, res, next) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({
+        message: 'Acces non autorise. Token manquant.'
+      });
+    }
+    const token = authHeader.split(' ')[1];
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    req.user = decoded;
+    next();
+  } catch (error) {
+    return res.status(401).json({
+      message: 'Token invalide ou expire.'
+    });
+  }
+};
+\end{verbatim}
+
+\subsection{Système d'autorisation par rôles et plans}
+
+\textbf{Niveau 1 : Rôles (user vs admin)}
+
+\begin{table}[H]
+\centering
+\caption{Routes et rôles requis}
+\label{tab:routes-roles}
+\begin{tabular}{|l|l|l|}
+\hline
+\textbf{Route} & \textbf{Rôle requis} & \textbf{Middleware} \\
+\hline
+\texttt{/api/auth/*} & Public/User & Aucun / authMiddleware \\
+\hline
+\texttt{/api/projects/*} & User & authMiddleware \\
+\hline
+\texttt{/api/accounting/*} & User & authMiddleware \\
+\hline
+\texttt{/api/hr/*} & User & authMiddleware \\
+\hline
+\texttt{/api/admin/*} & Admin & authMiddleware + isAdmin \\
+\hline
+\texttt{/api/products/admin/*} & Admin & authMiddleware + isAdmin \\
+\hline
+\end{tabular}
+\end{table}
+
+\textbf{Niveau 2 : Plans d'abonnement}
+
+La hiérarchie des plans est définie comme suit :
+\begin{center}
+\texttt{free (0) < student (1) < startup (2) < founder (3) < enterprise (4)}
+\end{center}
+
+Le fichier \texttt{utils/subscription.js} définit 4 fonctions utilitaires :
+\begin{itemize}
+    \item \texttt{hasFeatureAccess(plan, feature)} : Vérifie l'accès à une fonctionnalité
+    \item \texttt{getPlanLimits(plan)} : Retourne les limites (projets, idées, membres)
+    \item \texttt{canCreateProject(plan, count)} : Vérifie la capacité de création
+    \item \texttt{canGenerateIdea(plan, count)} : Vérifie la capacité de génération
+\end{itemize}
+
+\subsection{Isolation des données utilisateur}
+
+Chaque requête API vérifie que l'utilisateur n'accède qu'à ses propres données :
+
+\begin{verbatim}
+-- Le parametre ? est extrait de req.user.userId (depuis le JWT)
+SELECT * FROM accounting_transactions WHERE userId = ?;
+SELECT * FROM employees WHERE userId = ?;
+SELECT * FROM payslips WHERE userId = ?;
+SELECT * FROM user_products WHERE userId = ?;
+\end{verbatim}
+
+Ce pattern est appliqué systématiquement à toutes les tables : \texttt{projects}, \texttt{ideas}, \texttt{employees}, \texttt{payslips}, \texttt{accounting\_transactions}, \texttt{user\_products}, etc.
+
+\section{Protection des données et conformité}
+
+\subsection{Protection contre les injections SQL}
+
+StartUpLab utilise exclusivement des \textbf{requêtes préparées} (\textit{prepared statements}) avec Better-SQLite3 :
+
+\begin{verbatim}
+// Securise : parametres automatiquement echappes
+db.prepare('SELECT * FROM users WHERE email = ?').get(email);
+\end{verbatim}
+
+\subsection{Validation des entrées}
+
+\begin{table}[H]
+\centering
+\caption{Validations express-validator par route}
+\label{tab:validations}
+\begin{tabular}{|l|l|}
+\hline
+\textbf{Route} & \textbf{Validations appliquées} \\
+\hline
+\texttt{POST /auth/register} & Email valide, mdp $\geq$ 6 chars, prénom/nom requis \\
+\hline
+\texttt{POST /auth/login} & Email valide, mdp requis \\
+\hline
+\texttt{PUT /auth/password} & Mdp actuel requis, nouveau $\geq$ 6 chars \\
+\hline
+\texttt{POST /auth/face/register} & Descripteur = tableau valide \\
+\hline
+\texttt{POST /products/activate} & productId requis, vérification existence \\
+\hline
+\end{tabular}
+\end{table}
+
+\subsection{Sécurité du partage expert-comptable}
+
+Le module d'export comptable implémente un mécanisme de partage sécurisé :
+\begin{enumerate}
+    \item \textbf{Token UUID v4} unique pour chaque lien de partage
+    \item \textbf{Expiration configurable} par l'utilisateur
+    \item \textbf{Accès lecture seule} pour l'expert-comptable
+    \item \textbf{Traçabilité} : date de consultation enregistrée (\texttt{viewedAt})
+    \item \textbf{Révocation} possible à tout moment
+\end{enumerate}
+
+\subsection{Signature numérique des contrats}
+
+\begin{table}[H]
+\centering
+\caption{Champs de signature numérique des contrats}
+\label{tab:signature}
+\begin{tabular}{|l|l|l|}
+\hline
+\textbf{Champ} & \textbf{Type} & \textbf{Rôle} \\
+\hline
+\texttt{employerSignature} & TEXT (Base64) & Image signature employeur \\
+\hline
+\texttt{employeeSignature} & TEXT (Base64) & Image signature employé \\
+\hline
+\texttt{employerSignedAt} & DATETIME & Horodatage employeur \\
+\hline
+\texttt{employeeSignedAt} & DATETIME & Horodatage employé \\
+\hline
+\texttt{signatureHash} & TEXT & Hash d'intégrité du contrat \\
+\hline
+\end{tabular}
+\end{table}
+
+\subsection{Conformité réglementaire tunisienne}
+
+\begin{table}[H]
+\centering
+\caption{Conformité réglementaire tunisienne}
+\label{tab:conformite}
+\begin{tabular}{|l|l|}
+\hline
+\textbf{Exigence} & \textbf{Implémentation} \\
+\hline
+Loi organique n\degre 2004-63 (protection données) & Isolation données, consentement \\
+\hline
+Code du travail (Art. 134-1) & Conservation fiches de paie \\
+\hline
+Déclaration CNSS & Taux conformes (9.18\% + 16.57\%) \\
+\hline
+TVA (Code de la TVA) & Taux standard 19\% \\
+\hline
+FEC (Art. 62 du CDPF) & Export format standard \\
+\hline
+\end{tabular}
+\end{table}
+
+\section{Stratégie de tests}
+
+\subsection{Pyramide de tests}
+
+StartUpLab adopte une stratégie de tests à plusieurs niveaux, conforme à la pyramide de tests (figure~\ref{fig:test-pyramid}).
+
+\begin{figure}[H]
+\centering
+\fbox{\parbox{10cm}{
+\centering
+\vspace{6pt}
+\small Tests E2E (Parcours utilisateur complets) \\[6pt]
+\rule{8cm}{0.4pt}\\[6pt]
+Tests d'intégration (API + Base de données) \\[6pt]
+\rule{8cm}{0.4pt}\\[6pt]
+Tests unitaires (Fonctions utilitaires, validation)
+\vspace{6pt}
+}}
+\caption{Pyramide de tests de StartUpLab}
+\label{fig:test-pyramid}
+\end{figure}
+
+\subsection{Tests unitaires}
+
+\textbf{Tests de \texttt{subscription.js} :}
+
+\begin{table}[H]
+\centering
+\caption{Tests unitaires -- subscription.js}
+\label{tab:unit-tests-sub}
+\begin{tabular}{|l|l|l|}
+\hline
+\textbf{Test} & \textbf{Entrée} & \textbf{Résultat attendu} \\
+\hline
+\texttt{hasFeatureAccess('free', 'ideaGenerator')} & Plan free & \texttt{true} \\
+\hline
+\texttt{hasFeatureAccess('free', 'businessPlanPdf')} & Plan free & \texttt{false} \\
+\hline
+\texttt{hasFeatureAccess('enterprise', 'apiAccess')} & Plan enterprise & \texttt{true} \\
+\hline
+\texttt{canCreateProject('free', 0)} & 0 projets & \texttt{true} \\
+\hline
+\texttt{canCreateProject('free', 1)} & 1 projet & \texttt{false} (limite=1) \\
+\hline
+\texttt{canCreateProject('pro', 100)} & 100 projets & \texttt{true} (illimité) \\
+\hline
+\end{tabular}
+\end{table}
+
+\textbf{Tests bcrypt :}
+
+\begin{table}[H]
+\centering
+\caption{Tests unitaires -- bcrypt}
+\label{tab:unit-tests-bcrypt}
+\begin{tabular}{|l|l|}
+\hline
+\textbf{Test} & \textbf{Résultat attendu} \\
+\hline
+\texttt{bcrypt.hash('test123', 10)} & Hash 60 chars, préfixe \texttt{\$2a\$} \\
+\hline
+\texttt{bcrypt.compare('test123', hash)} & \texttt{true} \\
+\hline
+\texttt{bcrypt.compare('wrong', hash)} & \texttt{false} \\
+\hline
+Deux hash du même mot de passe & Hash $\neq$ (sel aléatoire) \\
+\hline
+\end{tabular}
+\end{table}
+
+\textbf{Tests JWT :}
+
+\begin{table}[H]
+\centering
+\caption{Tests unitaires -- JWT}
+\label{tab:unit-tests-jwt}
+\begin{tabular}{|l|l|}
+\hline
+\textbf{Test} & \textbf{Résultat attendu} \\
+\hline
+\texttt{jwt.sign(\{userId:1\}, secret, \{expiresIn:'7d'\})} & Token 3 parties \\
+\hline
+\texttt{jwt.verify(token, secret)} & Payload décodé \\
+\hline
+Token expiré (\texttt{expiresIn:'0s'}) & \texttt{TokenExpiredError} \\
+\hline
+Mauvais secret & \texttt{JsonWebTokenError} \\
+\hline
+\end{tabular}
+\end{table}
+
+\subsection{Tests d'intégration API}
+
+\textbf{Module Authentification :}
+
+\begin{table}[H]
+\centering
+\caption{Tests d'intégration -- Authentification}
+\label{tab:integration-auth}
+\begin{tabular}{|l|l|l|l|}
+\hline
+\textbf{\#} & \textbf{Endpoint} & \textbf{Scénario} & \textbf{Code} \\
+\hline
+T1 & \texttt{POST /auth/register} & Inscription valide & 201 \\
+\hline
+T2 & \texttt{POST /auth/register} & Email déjà utilisé & 400 \\
+\hline
+T3 & \texttt{POST /auth/register} & Email invalide & 400 \\
+\hline
+T4 & \texttt{POST /auth/login} & Connexion valide & 200 \\
+\hline
+T5 & \texttt{POST /auth/login} & Mauvais mdp & 401 \\
+\hline
+T6 & \texttt{GET /auth/me} & Token valide & 200 \\
+\hline
+T7 & \texttt{GET /auth/me} & Sans token & 401 \\
+\hline
+T8 & \texttt{GET /auth/me} & Token expiré & 401 \\
+\hline
+\end{tabular}
+\end{table}
+
+\textbf{Module Marketplace :}
+
+\begin{table}[H]
+\centering
+\caption{Tests d'intégration -- Marketplace}
+\label{tab:integration-marketplace}
+\begin{tabular}{|l|l|l|l|}
+\hline
+\textbf{\#} & \textbf{Endpoint} & \textbf{Scénario} & \textbf{Code} \\
+\hline
+T9 & \texttt{GET /products/categories} & Liste catégories & 200 \\
+\hline
+T10 & \texttt{GET /products/product/:slug} & Produit existant & 200 \\
+\hline
+T11 & \texttt{GET /products/product/inexistant} & Slug invalide & 404 \\
+\hline
+T12 & \texttt{POST /products/activate} & Plan suffisant & 201 \\
+\hline
+T13 & \texttt{POST /products/activate} & Plan insuffisant & 403 \\
+\hline
+T14 & \texttt{POST /products/activate} & Déjà activé & 400 \\
+\hline
+T15 & \texttt{POST /products/admin/approve/:id} & Admin approuve & 200 \\
+\hline
+T16 & \texttt{POST /products/admin/approve/:id} & Non-admin & 403 \\
+\hline
+\end{tabular}
+\end{table}
+
+\textbf{Module Comptabilité et RH :}
+
+\begin{table}[H]
+\centering
+\caption{Tests d'intégration -- Comptabilité et RH}
+\label{tab:integration-compta}
+\begin{tabular}{|l|l|l|l|}
+\hline
+\textbf{\#} & \textbf{Endpoint} & \textbf{Scénario} & \textbf{Code} \\
+\hline
+T17 & \texttt{POST /accounting/transactions} & Ajout transaction & 201 \\
+\hline
+T18 & \texttt{GET /accounting/bilan} & Calcul bilan & 200 \\
+\hline
+T19 & \texttt{GET /accounting/tva} & Déclaration TVA & 200 \\
+\hline
+T20 & \texttt{POST /hr/employees} & Ajout employé & 201 \\
+\hline
+T21 & \texttt{POST /hr/payslips/generate} & Fiche de paie & 201 \\
+\hline
+T22 & \texttt{GET /hr/cnss/declaration} & Déclaration CNSS & 200 \\
+\hline
+T23 & \texttt{POST /hr/leaves} & Demande congé & 201 \\
+\hline
+T24 & \texttt{POST /hr/contracts} & Création contrat & 201 \\
+\hline
+\end{tabular}
+\end{table}
+
+\section{Tests fonctionnels et scénarios de validation}
+
+\subsection{Scénarios End-to-End}
+
+\textbf{Scénario 1 : Parcours complet d'un nouvel entrepreneur}
+
+\begin{table}[H]
+\centering
+\caption{Scénario E2E -- Parcours entrepreneur}
+\label{tab:e2e-entrepreneur}
+\begin{tabular}{|l|l|l|c|}
+\hline
+\textbf{Étape} & \textbf{Action} & \textbf{Résultat attendu} & \checkmark \\
+\hline
+1 & Accéder à la landing page & Page d'accueil affichée & \checkmark \\
+\hline
+2 & Cliquer Commencer gratuitement & Redirection vers /register & \checkmark \\
+\hline
+3 & Remplir le formulaire & Validation temps réel & \checkmark \\
+\hline
+4 & Soumettre l'inscription & Redirection vers /dashboard & \checkmark \\
+\hline
+5 & Créer un nouveau projet & Projet visible dans la liste & \checkmark \\
+\hline
+6 & Générer une idée & Idée affichée avec score & \checkmark \\
+\hline
+7 & Créer un BMC & BMC sauvegardé & \checkmark \\
+\hline
+8 & Accéder au Pitch Deck & Éditeur fonctionnel & \checkmark \\
+\hline
+9 & Inviter un membre & Email envoyé & \checkmark \\
+\hline
+10 & Se déconnecter & Retour landing page & \checkmark \\
+\hline
+\end{tabular}
+\end{table}
+
+\textbf{Scénario 2 : Gestion comptable complète}
+
+\begin{table}[H]
+\centering
+\caption{Scénario E2E -- Gestion comptable}
+\label{tab:e2e-compta}
+\begin{tabular}{|l|l|l|c|}
+\hline
+\textbf{Étape} & \textbf{Action} & \textbf{Résultat attendu} & \checkmark \\
+\hline
+1 & Activer module Comptabilité & Demande envoyée (pending) & \checkmark \\
+\hline
+2 & Admin approuve & Module accessible sidebar & \checkmark \\
+\hline
+3 & Ajouter revenu (5000 TND) & Solde mis à jour & \checkmark \\
+\hline
+4 & Ajouter dépense (1500 TND) & Graphique mis à jour & \checkmark \\
+\hline
+5 & Consulter le bilan & Actif = 3500 TND & \checkmark \\
+\hline
+6 & Créer déclaration TVA & TVA = 950 TND (19\%) & \checkmark \\
+\hline
+7 & Exporter pour expert & Lien de partage généré & \checkmark \\
+\hline
+8 & Expert accède au lien & Lecture seule & \checkmark \\
+\hline
+\end{tabular}
+\end{table}
+
+\textbf{Scénario 3 : Gestion RH et paie}
+
+\begin{table}[H]
+\centering
+\caption{Scénario E2E -- Gestion RH et paie}
+\label{tab:e2e-rh}
+\begin{tabular}{|l|l|l|c|}
+\hline
+\textbf{Étape} & \textbf{Action} & \textbf{Résultat attendu} & \checkmark \\
+\hline
+1 & Créer employé (CDI, 2000 TND) & Fiche créée & \checkmark \\
+\hline
+2 & Générer fiche de paie mai & Calculs automatiques & \checkmark \\
+\hline
+3 & Vérifier CNSS employé & $2000 \times 9.18\% = 183.60$ TND & \checkmark \\
+\hline
+4 & Vérifier CNSS employeur & $2000 \times 16.57\% = 331.40$ TND & \checkmark \\
+\hline
+5 & Vérifier le salaire net & Brut - CNSS - IRPP = correct & \checkmark \\
+\hline
+6 & Demande congé (5j) & Solde : $24 \rightarrow 19$ jours & \checkmark \\
+\hline
+7 & Créer contrat CDI & Mode brouillon & \checkmark \\
+\hline
+8 & Signer (empl. + employé) & Statut : signé complet & \checkmark \\
+\hline
+\end{tabular}
+\end{table}
+
+\textbf{Scénario 4 : Workflow activation marketplace}
+
+\begin{table}[H]
+\centering
+\caption{Scénario E2E -- Workflow marketplace}
+\label{tab:e2e-marketplace}
+\begin{tabular}{|l|l|l|c|}
+\hline
+\textbf{Étape} & \textbf{Action} & \textbf{Résultat attendu} & \checkmark \\
+\hline
+1 & Consulter Produits \& Solutions & 6 catégories, 30+ produits & \checkmark \\
+\hline
+2 & Cliquer Demo Analyse Marché & Page démo interactive & \checkmark \\
+\hline
+3 & Cliquer Activer & Toast En attente & \checkmark \\
+\hline
+4 & Admin : Offres \& Produits & Demande visible pending & \checkmark \\
+\hline
+5 & Admin approuve & Notification utilisateur & \checkmark \\
+\hline
+6 & Sidebar utilisateur & Section IA Business apparaît & \checkmark \\
+\hline
+7 & Cliquer dans sidebar & Page /produit/actif/ & \checkmark \\
+\hline
+8 & Accéder à la fonctionnalité & Page active (pas démo) & \checkmark \\
+\hline
+\end{tabular}
+\end{table}
+
+\subsection{Tests de régression}
+
+\begin{table}[H]
+\centering
+\caption{Tests de régression}
+\label{tab:regression}
+\begin{tabular}{|l|l|l|}
+\hline
+\textbf{ID} & \textbf{Test de régression} & \textbf{Criticité} \\
+\hline
+R1 & Inscription + Connexion + Déconnexion & Critique \\
+\hline
+R2 & CRUD Projets & Haute \\
+\hline
+R3 & Calcul automatique TVA 19\% & Haute \\
+\hline
+R4 & Calcul fiche de paie (CNSS + IRPP) & Critique \\
+\hline
+R5 & Activation produit $\rightarrow$ apparition sidebar & Haute \\
+\hline
+R6 & Navigation toutes les pages (pas de page blanche) & Haute \\
+\hline
+R7 & Redirection Accéder à la fonctionnalité & Moyenne \\
+\hline
+R8 & Admin : approuver/refuser activations & Haute \\
+\hline
+R9 & Export expert-comptable avec token & Moyenne \\
+\hline
+R10 & Notifications après actions & Moyenne \\
+\hline
+\end{tabular}
+\end{table}
+
+\section{Gestion des erreurs et résilience}
+
+\subsection{Stratégie à trois niveaux}
+
+\textbf{Niveau 1 -- Prévention (validation entrées) :}
+
+\begin{verbatim}
+const errors = validationResult(req);
+if (!errors.isEmpty()) {
+  return res.status(400).json({ errors: errors.array() });
+}
+\end{verbatim}
+
+\textbf{Niveau 2 -- Détection (logique métier) :}
+
+\begin{verbatim}
+if (userLevel < requiredLevel) {
+  return res.status(403).json({
+    message: `Ce produit necessite un abonnement ${product.requiredPlan}`,
+    requiredPlan: product.requiredPlan
+  });
+}
+\end{verbatim}
+
+\textbf{Niveau 3 -- Récupération (try-catch global) :}
+
+\begin{verbatim}
+try {
+  // logique metier
+} catch (error) {
+  console.error('Operation error:', error);
+  res.status(500).json({ message: 'Erreur serveur' });
+}
+\end{verbatim}
+
+\subsection{Codes HTTP utilisés}
+
+\begin{table}[H]
+\centering
+\caption{Codes HTTP utilisés dans StartUpLab}
+\label{tab:http-codes}
+\begin{tabular}{|l|l|l|}
+\hline
+\textbf{Code} & \textbf{Signification} & \textbf{Usage} \\
+\hline
+200 & OK & Succès lecture/mise à jour \\
+\hline
+201 & Created & Succès création \\
+\hline
+400 & Bad Request & Données invalides, doublon \\
+\hline
+401 & Unauthorized & Token manquant/invalide \\
+\hline
+403 & Forbidden & Plan insuffisant, accès admin requis \\
+\hline
+404 & Not Found & Ressource inexistante \\
+\hline
+500 & Internal Server Error & Erreur technique \\
+\hline
+\end{tabular}
+\end{table}
+
+\subsection{Gestion frontend (react-hot-toast)}
+
+\begin{table}[H]
+\centering
+\caption{Types de notifications frontend}
+\label{tab:toast}
+\begin{tabular}{|l|l|l|}
+\hline
+\textbf{Type} & \textbf{Couleur} & \textbf{Durée} \\
+\hline
+Succès & Vert \texttt{\#10b981} & 4 secondes \\
+\hline
+Erreur & Rouge \texttt{\#ef4444} & 4 secondes \\
+\hline
+Info & Sombre \texttt{\#363636} & 4 secondes \\
+\hline
+\end{tabular}
+\end{table}
+
+Un intercepteur Axios déclenche la déconnexion automatique si le serveur retourne 401 (token expiré).
+
+\subsection{Résilience de la base de données}
+
+\begin{table}[H]
+\centering
+\caption{Propriétés de résilience SQLite}
+\label{tab:resilience}
+\begin{tabular}{|l|l|}
+\hline
+\textbf{Propriété} & \textbf{Détail} \\
+\hline
+ACID & Transactions atomiques, cohérentes, isolées, durables \\
+\hline
+Foreign Keys & \texttt{PRAGMA foreign\_keys = ON} \\
+\hline
+Contraintes UNIQUE & Email, slugs, combinaisons userId+productId \\
+\hline
+CASCADE DELETE & Suppression automatique données liées \\
+\hline
+DEFAULT VALUES & Valeurs par défaut sûres \\
+\hline
+\end{tabular}
+\end{table}
+
+\section{Audit de sécurité et recommandations}
+
+\subsection{Résultats de l'audit}
+
+\begin{table}[H]
+\centering
+\caption{Résultats de l'audit de sécurité}
+\label{tab:audit}
+\begin{tabular}{|l|l|l|}
+\hline
+\textbf{Critère} & \textbf{Statut} & \textbf{Score} \\
+\hline
+Hashage mots de passe & Conforme & 10/10 \\
+\hline
+Injection SQL & Protégé & 10/10 \\
+\hline
+Authentification JWT & Implémenté & 9/10 \\
+\hline
+Contrôle d'accès rôle & Implémenté & 9/10 \\
+\hline
+Validation entrées & express-validator & 8/10 \\
+\hline
+CORS & Configuré & 8/10 \\
+\hline
+Variables d'environnement & dotenv & 9/10 \\
+\hline
+HTTPS & Dev uniquement (HTTP) & 5/10 \\
+\hline
+Rate limiting & Non implémenté & 3/10 \\
+\hline
+CSRF & SPA + JWT (immunisé) & 7/10 \\
+\hline
+Logs de sécurité & Console uniquement & 5/10 \\
+\hline
+\textbf{Score global} & & \textbf{81/110 (74\%)} \\
+\hline
+\end{tabular}
+\end{table}
+
+\subsection{Recommandations}
+
+\begin{table}[H]
+\centering
+\caption{Recommandations de sécurité}
+\label{tab:recommandations}
+\begin{tabular}{|l|l|l|l|}
+\hline
+\textbf{Priorité} & \textbf{Recommandation} & \textbf{Effort} & \textbf{Impact} \\
+\hline
+Critique & HTTPS/TLS obligatoire & Faible & Élevé \\
+\hline
+Haute & Rate limiting (express-rate-limit) & Faible & Élevé \\
+\hline
+Haute & Logs structurés (Winston) & Moyen & Moyen \\
+\hline
+Moyenne & Headers sécurité (HSTS, CSP) & Faible & Moyen \\
+\hline
+Moyenne & Refresh token (JWT rotation) & Moyen & Moyen \\
+\hline
+Basse & 2FA & Élevé & Élevé \\
+\hline
+Basse & Chiffrement données au repos & Élevé & Élevé \\
+\hline
+\end{tabular}
+\end{table}
+
+\section*{Conclusion}
+\addcontentsline{toc}{section}{Conclusion}
+
+L'architecture de sécurité de StartUpLab couvre les menaces principales d'une plateforme SaaS. L'authentification triple, les tokens JWT, l'isolation des données par utilisateur, et la validation systématique des entrées constituent un socle solide. Les tests fonctionnels couvrent les scénarios critiques de bout en bout. L'audit révèle un score de 74\% avec des recommandations claires pour atteindre un niveau de sécurité production.

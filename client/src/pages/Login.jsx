@@ -27,14 +27,16 @@ const Login = () => {
   useEffect(() => {
     const loadModels = async () => {
       try {
+        console.log('Loading face-api.js models...');
         await Promise.all([
           faceapi.nets.tinyFaceDetector.loadFromUri('/models'),
           faceapi.nets.faceLandmark68Net.loadFromUri('/models'),
           faceapi.nets.faceRecognitionNet.loadFromUri('/models')
         ]);
         setModelsLoaded(true);
+        console.log('Face models loaded successfully');
       } catch (error) {
-        console.log('Face models not loaded - facial recognition unavailable');
+        console.error('Face models not loaded:', error);
       }
     };
     loadModels();
@@ -42,16 +44,35 @@ const Login = () => {
     return () => stopCamera();
   }, []);
 
+  // Start camera when switching to face login mode
+  useEffect(() => {
+    if (loginMethod === 'face') {
+      startCamera();
+    } else {
+      stopCamera();
+    }
+  }, [loginMethod]);
+
   const startCamera = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
       streamRef.current = stream;
-      // Wait for video element to be in DOM
-      setTimeout(() => {
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-        }
-      }, 100);
+      // Wait for video element to be rendered in DOM
+      const waitForVideo = () => {
+        return new Promise((resolve) => {
+          const check = () => {
+            if (videoRef.current) {
+              videoRef.current.srcObject = stream;
+              resolve();
+            } else {
+              requestAnimationFrame(check);
+            }
+          };
+          check();
+        });
+      };
+      await waitForVideo();
+      console.log('Camera started successfully');
     } catch (error) {
       console.error('Camera error:', error);
       toast.error('Impossible d\'accéder à la caméra');
@@ -172,7 +193,7 @@ const Login = () => {
                 Email
               </button>
               <button
-                onClick={() => { setLoginMethod('face'); startCamera(); }}
+                onClick={() => { setLoginMethod('face'); }}
                 className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-2 ${loginMethod === 'face' ? 'bg-white text-gray-900' : 'text-white hover:bg-white/10'}`}
               >
                 <Camera className="w-4 h-4" /> Visage

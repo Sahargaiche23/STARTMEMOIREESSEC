@@ -22,7 +22,18 @@ import {
   Users,
   Calendar,
   Building2,
-  PenTool
+  PenTool,
+  TrendingUp,
+  Briefcase,
+  Brain,
+  Globe,
+  Smartphone,
+  Target,
+  Mail,
+  Truck,
+  Layers,
+  Search as SearchIcon,
+  Activity
 } from 'lucide-react';
 import useAuthStore from '../store/authStore';
 import NotificationBell from './NotificationBell';
@@ -32,6 +43,10 @@ const Layout = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [accountingOpen, setAccountingOpen] = useState(false);
   const [hrOpen, setHrOpen] = useState(false);
+  const [erpOpen, setErpOpen] = useState(false);
+  const [marketingOpen, setMarketingOpen] = useState(false);
+  const [expertOpen, setExpertOpen] = useState(false);
+  const [iaOpen, setIaOpen] = useState(false);
   const [activeModules, setActiveModules] = useState([]);
   const [activeProducts, setActiveProducts] = useState([]);
   const location = useLocation();
@@ -82,7 +97,35 @@ const Layout = ({ children }) => {
     p.slug === 'signature-contrat'
   );
   const hasHrModule = hrProducts.length > 0;
-  
+
+  // ERP Products
+  const erpProducts = activeProducts.filter(p => 
+    p.categoryName === 'ERP & Gestion d\'entreprise' || 
+    ['gestion-fournisseurs','gestion-stock','gestion-facturation','multi-branches','tableau-financier'].includes(p.slug)
+  );
+  const hasErpModule = erpProducts.length > 0;
+
+  // Marketing Products
+  const marketingProducts = activeProducts.filter(p => 
+    p.categoryName === 'Marketing & Growth' || 
+    ['creation-site','creation-app','seo-tunisie','facebook-ads','email-marketing','landing-pages'].includes(p.slug)
+  );
+  const hasMarketingModule = marketingProducts.length > 0;
+
+  // Expert-Comptable Products
+  const expertProducts = activeProducts.filter(p => 
+    p.categoryName === 'Solutions Experts-Comptables' || 
+    ['acces-expert','validation-factures','export-fec','tableau-fiscal','historique-transactions'].includes(p.slug)
+  );
+  const hasExpertModule = expertProducts.length > 0;
+
+  // IA Products
+  const iaProducts = activeProducts.filter(p => 
+    p.categoryName === 'Intelligence Business (IA)' || 
+    ['score-sante','prevision-cashflow','analyse-concurrence','analyse-marche','prediction-ventes'].includes(p.slug)
+  );
+  const hasIaModule = iaProducts.length > 0;
+
   const isEnterprise = user?.subscription === 'enterprise';
 
   const navigation = [
@@ -142,6 +185,31 @@ const Layout = ({ children }) => {
     'signature-contrat': [
       { name: 'Contrats', href: '/rh/contrats', icon: PenTool },
     ],
+    // ERP Products
+    'gestion-fournisseurs': [{ name: 'Fournisseurs', href: '/produit/actif/gestion-fournisseurs', icon: Truck }],
+    'gestion-stock': [{ name: 'Stock', href: '/produit/actif/gestion-stock', icon: Package }],
+    'gestion-facturation': [{ name: 'Facturation', href: '/produit/actif/gestion-facturation', icon: Receipt }],
+    'multi-branches': [{ name: 'Multi-branches', href: '/produit/actif/multi-branches', icon: Layers }],
+    'tableau-financier': [{ name: 'Tableau Financier', href: '/produit/actif/tableau-financier', icon: BarChart3 }],
+    // Marketing Products
+    'creation-site': [{ name: 'Site Web', href: '/produit/actif/creation-site', icon: Globe }],
+    'creation-app': [{ name: 'App Mobile', href: '/produit/actif/creation-app', icon: Smartphone }],
+    'seo-tunisie': [{ name: 'SEO', href: '/produit/actif/seo-tunisie', icon: SearchIcon }],
+    'facebook-ads': [{ name: 'Facebook Ads', href: '/produit/actif/facebook-ads', icon: Target }],
+    'email-marketing': [{ name: 'Email Marketing', href: '/produit/actif/email-marketing', icon: Mail }],
+    'landing-pages': [{ name: 'Landing Pages', href: '/produit/actif/landing-pages', icon: FileText }],
+    // Expert Products
+    'acces-expert': [{ name: 'Accès Expert', href: '/produit/actif/acces-expert', icon: Users }],
+    'validation-factures': [{ name: 'Validation Factures', href: '/produit/actif/validation-factures', icon: Check }],
+    'export-fec': [{ name: 'Export FEC', href: '/produit/actif/export-fec', icon: FileText }],
+    'tableau-fiscal': [{ name: 'Tableau Fiscal', href: '/produit/actif/tableau-fiscal', icon: Calendar }],
+    'historique-transactions': [{ name: 'Historique', href: '/produit/actif/historique-transactions', icon: Receipt }],
+    // IA Products
+    'score-sante': [{ name: 'Score Santé', href: '/produit/actif/score-sante', icon: Activity }],
+    'prevision-cashflow': [{ name: 'Cashflow IA', href: '/produit/actif/prevision-cashflow', icon: TrendingUp }],
+    'analyse-concurrence': [{ name: 'Concurrence', href: '/produit/actif/analyse-concurrence', icon: Target }],
+    'analyse-marche': [{ name: 'Analyse Marché', href: '/produit/actif/analyse-marche', icon: BarChart3 }],
+    'prediction-ventes': [{ name: 'Prédiction Ventes', href: '/produit/actif/prediction-ventes', icon: Brain }],
   };
 
   // Get unique HR features from all activated products
@@ -189,6 +257,28 @@ const Layout = ({ children }) => {
   };
 
   const accountingNav = getAccountingNav();
+
+  // Generic nav builder for any category
+  const getCategoryNav = (products) => {
+    const allFeatures = [];
+    const seenKeys = new Set();
+    products.forEach(product => {
+      const features = productFeatures[product.slug] || [];
+      features.forEach(feature => {
+        const key = feature.href;
+        if (!seenKeys.has(key)) {
+          seenKeys.add(key);
+          allFeatures.push(feature);
+        }
+      });
+    });
+    return allFeatures;
+  };
+
+  const erpNav = getCategoryNav(erpProducts);
+  const marketingNav = getCategoryNav(marketingProducts);
+  const expertNav = getCategoryNav(expertProducts);
+  const iaNav = getCategoryNav(iaProducts);
 
   const handleLogout = () => {
     logout();
@@ -322,50 +412,103 @@ const Layout = ({ children }) => {
               </div>
             )}
 
+            {/* ERP Module */}
+            {hasErpModule && (
+              <div className="mt-2">
+                <button onClick={() => setErpOpen(!erpOpen)} className="w-full flex items-center justify-between px-3 py-2 text-sm font-medium text-purple-700 bg-purple-50 rounded-lg hover:bg-purple-100 transition-colors">
+                  <div className="flex items-center gap-2"><Building2 className="w-5 h-5" /><span>ERP</span></div>
+                  {erpOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                </button>
+                {erpOpen && (
+                  <div className="mt-1 ml-2 space-y-1">
+                    {erpNav.map((item) => (
+                      <Link key={item.name} to={item.href} className={`sidebar-link text-sm ${location.pathname === item.href ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
+                        <item.icon className="w-4 h-4" /><span>{item.name}</span>
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Marketing Module */}
+            {hasMarketingModule && (
+              <div className="mt-2">
+                <button onClick={() => setMarketingOpen(!marketingOpen)} className="w-full flex items-center justify-between px-3 py-2 text-sm font-medium text-amber-700 bg-amber-50 rounded-lg hover:bg-amber-100 transition-colors">
+                  <div className="flex items-center gap-2"><TrendingUp className="w-5 h-5" /><span>Marketing</span></div>
+                  {marketingOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                </button>
+                {marketingOpen && (
+                  <div className="mt-1 ml-2 space-y-1">
+                    {marketingNav.map((item) => (
+                      <Link key={item.name} to={item.href} className={`sidebar-link text-sm ${location.pathname === item.href ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
+                        <item.icon className="w-4 h-4" /><span>{item.name}</span>
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Expert-Comptable Module */}
+            {hasExpertModule && (
+              <div className="mt-2">
+                <button onClick={() => setExpertOpen(!expertOpen)} className="w-full flex items-center justify-between px-3 py-2 text-sm font-medium text-orange-700 bg-orange-50 rounded-lg hover:bg-orange-100 transition-colors">
+                  <div className="flex items-center gap-2"><Briefcase className="w-5 h-5" /><span>Expert-Comptable</span></div>
+                  {expertOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                </button>
+                {expertOpen && (
+                  <div className="mt-1 ml-2 space-y-1">
+                    {expertNav.map((item) => (
+                      <Link key={item.name} to={item.href} className={`sidebar-link text-sm ${location.pathname === item.href ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
+                        <item.icon className="w-4 h-4" /><span>{item.name}</span>
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Intelligence Business (IA) Module */}
+            {hasIaModule && (
+              <div className="mt-2">
+                <button onClick={() => setIaOpen(!iaOpen)} className="w-full flex items-center justify-between px-3 py-2 text-sm font-medium text-red-700 bg-red-50 rounded-lg hover:bg-red-100 transition-colors">
+                  <div className="flex items-center gap-2"><Brain className="w-5 h-5" /><span>IA Business</span></div>
+                  {iaOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                </button>
+                {iaOpen && (
+                  <div className="mt-1 ml-2 space-y-1">
+                    {iaNav.map((item) => (
+                      <Link key={item.name} to={item.href} className={`sidebar-link text-sm ${location.pathname === item.href ? 'active' : ''}`} onClick={() => setSidebarOpen(false)}>
+                        <item.icon className="w-4 h-4" /><span>{item.name}</span>
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Active Products Summary */}
             {activeProducts.length > 0 && (
               <div className="mt-4 pt-4 border-t border-gray-200">
                 <p className="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
                   Offres Actives
                 </p>
-                <div className="space-y-3">
-                  {activeProducts.slice(0, 3).map((product) => {
-                    const productFeaturesMap = {
-                      'bilan-auto': ['Bilan actif/passif', 'Analyse automatique', 'Format standard tunisien'],
-                      'comptabilite-lite': ['Saisie revenus/dépenses', 'Calcul automatique', 'Export PDF'],
-                      'comptabilite-pro': ['Bilan automatique', 'Compte de résultat', 'Cash Flow', 'Prévision financière'],
-                      'tva-tunisie': ['Calcul TVA 19%/7%', 'Déclaration mensuelle', 'Export administration'],
-                      'export-expert': ['Format FEC', 'Export Excel/PDF', 'Partage sécurisé'],
-                    };
-                    const features = productFeaturesMap[product.slug] || [];
-                    return (
-                      <div key={product.id} className="px-3">
-                        <Link
-                          to={`/produit/demo/${product.slug}`}
-                          className="flex items-center gap-2 text-sm font-medium text-green-700 mb-2 hover:text-green-800"
-                        >
-                          <div className="w-2 h-2 bg-green-500 rounded-full flex-shrink-0" />
-                          <span>{product.productName}</span>
-                        </Link>
-                        {features.length > 0 && (
-                          <div className="ml-4 space-y-1">
-                            {features.map((feature, idx) => (
-                              <div key={idx} className="flex items-center gap-2 text-xs text-gray-600">
-                                <Check className="w-3 h-3 text-green-500 flex-shrink-0" />
-                                <span>{feature}</span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                  {activeProducts.length > 3 && (
+                <div className="space-y-1">
+                  {activeProducts.slice(0, 5).map((product) => (
                     <Link
-                      to="/mes-offres"
-                      className="block px-3 py-1 text-xs text-primary-600 hover:underline"
+                      key={product.id}
+                      to={`/produit/demo/${product.slug}`}
+                      className="flex items-center gap-2 px-3 py-1 text-sm text-green-700 hover:text-green-800 hover:bg-green-50 rounded-lg"
+                      onClick={() => setSidebarOpen(false)}
                     >
-                      +{activeProducts.length - 3} autres offres
+                      <div className="w-2 h-2 bg-green-500 rounded-full flex-shrink-0" />
+                      <span className="truncate">{product.productName}</span>
+                    </Link>
+                  ))}
+                  {activeProducts.length > 5 && (
+                    <Link to="/mes-offres" className="block px-3 py-1 text-xs text-primary-600 hover:underline">
+                      +{activeProducts.length - 5} autres offres
                     </Link>
                   )}
                 </div>

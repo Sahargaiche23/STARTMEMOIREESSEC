@@ -1,0 +1,26 @@
+services:
+  - type: web
+    name: startuplab-api
+    runtime: node
+    region: frankfurt
+    rootDir: server
+    buildCommand: npm install
+    startCommand: node src/index.js
+    plan: free
+    envVars:
+      - key: PORT
+        value: 10000
+      - key: JWT_SECRET
+        generateValue: true
+      - key: NODE_ENV
+        value: production
+      - key: FRONTEND_URL
+        value: https://startuplab-sahar.netlify.app
+      - key: EMAIL_USER
+        sync: false
+      - key: EMAIL_PASS
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false

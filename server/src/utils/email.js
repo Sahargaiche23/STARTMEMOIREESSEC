@@ -21,7 +21,7 @@ const sendInvitationEmail = async (to, projectName, inviterName, role, inviteTok
     viewer: 'Lecteur'
   };
 
-  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3001';
   // If user has no account, use invite link; otherwise use login link
   const actionUrl = inviteToken 
     ? `${frontendUrl}/invite/${inviteToken}` 

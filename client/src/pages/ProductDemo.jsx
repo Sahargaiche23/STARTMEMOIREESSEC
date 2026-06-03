@@ -3,11 +3,19 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { 
   ArrowLeft, Check, Play, Star, Lock, Calculator, 
   TrendingUp, TrendingDown, PieChart, FileText, 
-  Receipt, BarChart3, Download, Users, Briefcase, Clock
+  Receipt, BarChart3, Download, Users, Briefcase, Clock,
+  Globe, Smartphone, Search, Target, Mail, Layout,
+  UserCheck, FileCheck, Database, Calendar, History,
+  Activity, LineChart, Eye, Map, Zap, Shield, Package,
+  ShoppingCart, Truck, Layers, BarChart2, DollarSign,
+  AlertTriangle, CheckCircle, ArrowUpRight, ArrowDownRight,
+  Send, MousePointer, Palette, Code, Megaphone, Share2
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../utils/api';
 import useAuthStore from '../store/authStore';
+import { erpDemos, marketingDemos } from './demosMarketing';
+import { expertDemos, iaDemos } from './demosExpertIA';
 
 const ProductDemo = () => {
   const { slug } = useParams();
@@ -18,15 +26,21 @@ const ProductDemo = () => {
   const [activating, setActivating] = useState(false);
   const [userProduct, setUserProduct] = useState(null);
 
-  // Mapping des produits vers leurs pages réelles
-  const productRedirects = {
+  // Mapping des produits vers leurs pages réelles (ou page active si pas de page dédiée)
+  const realPages = {
     'bilan-auto': '/comptabilite/bilan',
     'comptabilite-lite': '/comptabilite',
     'comptabilite-pro': '/comptabilite',
     'tva-tunisie': '/comptabilite/tva',
     'export-expert': '/comptabilite/export',
-    'pack-comptabilite-complet': '/comptabilite'
+    'pack-comptabilite-complet': '/comptabilite',
+    'gestion-employes': '/rh/employes',
+    'fiches-paie': '/rh/fiches-paie',
+    'declaration-cnss': '/rh/cnss',
+    'gestion-conges': '/rh/conges',
+    'signature-contrat': '/rh/contrats',
   };
+  const getProductRedirect = (s) => realPages[s] || `/produit/actif/${s}`;
 
   useEffect(() => {
     fetchProduct();
@@ -59,19 +73,18 @@ const ProductDemo = () => {
   };
 
   const handleActivate = async () => {
-    if (user?.subscription !== 'enterprise') {
-      toast.error('Cette fonctionnalité nécessite un abonnement Enterprise');
-      navigate('/pricing');
-      return;
-    }
-
     setActivating(true);
     try {
       await api.post('/products/activate', { productId: product.id, duration: 1 });
       toast.success('Demande envoyée ! En attente d\'approbation.');
-      navigate('/mes-offres');
+      checkUserProduct();
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Erreur');
+      if (error.response?.data?.requiredPlan) {
+        toast.error(`Abonnement ${error.response.data.requiredPlan} requis`);
+        navigate('/pricing');
+      } else {
+        toast.error(error.response?.data?.message || 'Erreur lors de l\'activation');
+      }
     } finally {
       setActivating(false);
     }
@@ -1225,7 +1238,12 @@ const ProductDemo = () => {
             )
           }
         ]
-      }
+      },
+      // Merge all external demos
+      ...erpDemos,
+      ...marketingDemos,
+      ...expertDemos,
+      ...iaDemos
     };
 
     return demos[product.slug] || {
@@ -1284,7 +1302,7 @@ const ProductDemo = () => {
           </div>
           {userProduct?.status === 'active' ? (
             <Link
-              to={productRedirects[slug] || '/mes-offres'}
+              to={getProductRedirect(slug)}
               className="px-6 py-3 bg-green-500 text-white rounded-xl font-semibold hover:bg-green-600 transition-colors flex items-center gap-2"
             >
               <Check className="w-5 h-5" />
@@ -1295,7 +1313,7 @@ const ProductDemo = () => {
               <Clock className="w-5 h-5" />
               En attente d'approbation
             </div>
-          ) : user?.subscription === 'enterprise' ? (
+          ) : user ? (
             <button
               onClick={handleActivate}
               disabled={activating}
@@ -1305,11 +1323,11 @@ const ProductDemo = () => {
             </button>
           ) : (
             <Link
-              to="/pricing"
+              to="/login"
               className="px-6 py-3 bg-white/20 text-white rounded-xl font-semibold hover:bg-white/30 transition-colors flex items-center gap-2"
             >
               <Lock className="w-5 h-5" />
-              Passer à Enterprise
+              Connectez-vous pour activer
             </Link>
           )}
         </div>
@@ -1354,7 +1372,7 @@ const ProductDemo = () => {
           <h3 className="text-xl font-bold text-gray-900 mb-2">Prêt à commencer ?</h3>
           <p className="text-gray-600 mb-4">Activez ce module et commencez à gérer votre comptabilité</p>
           {userProduct?.status === 'active' ? (
-            <Link to={productRedirects[slug] || '/mes-offres'} className="btn-primary px-8 py-3 inline-flex items-center gap-2 bg-green-600 hover:bg-green-700">
+            <Link to={getProductRedirect(slug)} className="btn-primary px-8 py-3 inline-flex items-center gap-2 bg-green-600 hover:bg-green-700">
               <Check className="w-5 h-5" />
               Accéder à la fonctionnalité
             </Link>

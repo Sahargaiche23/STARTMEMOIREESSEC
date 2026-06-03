@@ -624,7 +624,7 @@ router.post('/share/invite', authMiddleware, async (req, res) => {
       }
     });
 
-    const accessLink = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/comptabilite/shared/${accessToken}`;
+    const accessLink = `${process.env.FRONTEND_URL || 'http://localhost:3001'}/comptabilite/shared/${accessToken}`;
     
     const mailOptions = {
       from: `"StartUpLab" <${process.env.EMAIL_USER}>`,

@@ -37,6 +37,7 @@ import AccountingTVA from './pages/accounting/AccountingTVA';
 import AccountingExport from './pages/accounting/AccountingExport';
 import SharedAccountingData from './pages/accounting/SharedAccountingData';
 import ProductDemo from './pages/ProductDemo';
+import ActiveProductPage from './pages/ActiveProductPage';
 import EmployeeManagement from './pages/hr/EmployeeManagement';
 import Payslips from './pages/hr/Payslips';
 import CNSSDeclaration from './pages/hr/CNSSDeclaration';
@@ -208,6 +209,13 @@ function App() {
           <ProtectedRoute>
             <Layout>
               <ProductDemo />
+            </Layout>
+          </ProtectedRoute>
+        } />
+        <Route path="/produit/actif/:slug" element={
+          <ProtectedRoute>
+            <Layout>
+              <ActiveProductPage />
             </Layout>
           </ProtectedRoute>
         } />
